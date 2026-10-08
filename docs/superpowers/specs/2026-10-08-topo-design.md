@@ -85,8 +85,8 @@ docker-compose
 area           id, parent_id, kind {obszar|region|sektor}, name, slug, description
 crag           id, area_id, name, slug, location geometry(Point,4326),
                rock_type, height_min, height_max, aspects text[], formations text[],
-               approach_minutes, description, approach_description
-wall           id, crag_id, name, sort_order, version (int, do kontroli konfliktów),
+               approach_minutes, child_friendly, surroundings, description, approach_description
+wall           id, crag_id, name, description, sort_order, version (int, do kontroli konfliktów),
                image_original_path, image_path (WebP 1600 px), thumb_path (WebP 400 px),
                image_width, image_height,
                depth_path, depth_status {pending|ready|failed}, depth_model
@@ -94,7 +94,7 @@ route          id, crag_id, number, name, grade, grade_sort (int), length_m,
                protection, first_ascent, year, description
 route_line     id, wall_id, route_id, color, sort_order, parent_line_id, parent_point_id
 line_point     id, line_id, sort_order, x, y (float 0–1 względem zdjęcia),
-               kind {start|ring|hak|ucho|stanowisko|przelot}, visible
+               kind {start|ring|hak|ucho|stanowisko|ogranicznik|przelot}, visible  (przelot = punkt pomocniczy linii, niewidoczny)
 depth_job      id, wall_id, model, status {queued|running|done|failed}, error, created_at
 ```
 
@@ -171,9 +171,11 @@ react-konva: zdjęcie (WebP), wygładzone linie (`tension`), ikony wpinek, numer
 
 Na ścianę: oryginał (zachowywany, ~1,2 MB), WebP 1600 px q80 (~300 KB), miniatura WebP 400 px (~25 KB), mapa głębi PNG 16-bit ~768 px (~100 KB). Łącznie dla ~2318 ścian ≈ 3,8 GB (bez oryginałów ≈ 1 GB). Baza ≈ 50 MB.
 
-Układ: `media/walls/{wall_id}/original.{ext}`, `display.webp`, `thumb.webp`, `depth.png`. Pliki serwowane przez nginx z nagłówkami cache.
+Układ: `media/walls/{wall_id}/original.{ext}`, `display.webp`, `thumb.webp`, `depth.png`. Pliki serwowane przez nginx z nagłówkami cache. Na hoście katalog `./media/` (bind mount), żeby łatwo przenieść go na serwer (rsync); surowe odpowiedzi importu w `./cache/`.
 
 ## 8. Import i przetwarzanie (CLI)
+
+**Kolejność (decyzja z 2026-10-08):** historia zmian (SQLAlchemy-Continuum, tabela `transaction` z `author` i `comment`) jest włączana *przed* pierwszym importem — każdy zaimportowany rekord ma wersję bazową podpisaną `import:portalgorski`, więc ręczne poprawki można cofnąć do danych z portalu. Zmiana z autorem spoza prefiksu `import:` (albo bez autora) to „ręczna zmiana”, której import nie nadpisuje.
 
 ```
 lokalnie (compose z api-gpu):
