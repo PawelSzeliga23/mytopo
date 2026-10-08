@@ -10,7 +10,9 @@ Uzupełnia: `docs/superpowers/specs/2026-10-08-topo-design.md` §6
 
 ## 2. System wizualny
 
-### 2.1 Kolory (zmienne CSS na `:root` i `[data-theme="dark"]`)
+### 2.1 Kolory (zmienne CSS na `:root` i `.dark`)
+
+W kodzie tokeny używają nazw shadcn/ui (`--background`, `--foreground`, `--secondary`, `--muted-foreground`, `--border`, `--primary`…); akcent projektu to `--brand` (bo shadcn używa `--accent` jako tła najechania). Przycisk główny (`--primary`) w jasnym motywie jest atramentowy, w ciemnym — w kolorze akcentu.
 
 | Token | Jasny | Ciemny | Użycie |
 |---|---|---|---|
@@ -43,7 +45,7 @@ Pasma trudności (wspólne z Portalem Górskim; linie na zdjęciach, numerki dr�
 ### 2.3 Motyw
 
 - Domyślnie zgodny z ustawieniem systemu (`prefers-color-scheme`); przełącznik ☾/☀ w pasku nadpisuje i zapamiętuje wybór w `localStorage` (odczyt w try/catch).
-- Atrybut `data-theme` na `<html>` ustawiany przed pierwszym renderem (skrypt w `index.html`), bez mignięcia.
+- Klasa `dark` na `<html>` ustawiana przed pierwszym renderem (skrypt w `index.html`), bez mignięcia.
 
 ### 2.4 Komponenty
 
