@@ -45,12 +45,20 @@ _POINT_KINDS = {
     "stanowisko zjazdowe": "stanowisko",
     "dwa ringi zjazdowe": "stanowisko",
     "ogranicznik": "ogranicznik",
+    "spit": "ring",
+    "ring zjazdowy": "stanowisko",
+    "pętla": "ucho",
+    "niewidoczny fragment drogi": "przelot",
 }
 KNOWN_POINT_KINDS = frozenset(_POINT_KINDS)
+_INVISIBLE_KINDS = frozenset({"niewidoczny fragment drogi"})
 
 
 def map_point(kind_name: str, type_id: int | None, index: int) -> tuple[str, bool]:
-    """Portal point → (our kind, visible). typeId 1 marks a helper point that is not a bolt."""
+    """Portal point → (our kind, visible). typeId 1 marks a helper point that is not a bolt.
+
+    An unknown kind becomes an invisible helper point (przelot); store reports it as unknown.
+    """
     name = kind_name.strip().lower()
     if type_id == 1:
         if index == 0:
@@ -58,7 +66,9 @@ def map_point(kind_name: str, type_id: int | None, index: int) -> tuple[str, boo
         if name == "ring":
             return "przelot", False
         return _POINT_KINDS.get(name, "przelot"), False
-    return _POINT_KINDS.get(name, "przelot"), True
+    if name in _INVISIBLE_KINDS or name not in _POINT_KINDS:
+        return "przelot", False
+    return _POINT_KINDS[name], True
 
 
 def parse_start(raw: bytes) -> StartList:
@@ -119,7 +129,7 @@ def parse_rock_page(raw: bytes) -> RockPage:
 def parse_paths(raw: bytes) -> WallTopo:
     data = json.loads(raw)
     if data.get("status") != 1:
-        return WallTopo(lines=[], routes=[])
+        raise ValueError(f"Portal zwrócił status {data.get('status')} dla topo")
     lines = []
     for path in data.get("data") or []:
         raw_points = path.get("points") or []
@@ -205,8 +215,7 @@ def _details(tree: HTMLParser) -> dict[str, Any]:
         if code == "pGPS":
             small = cell.css_first("span.dataSm")
             if small is not None:
-                lat, lng = small.text().split(",")
-                details["lat"], details["lng"] = float(lat), float(lng)
+                details["lat"], details["lng"] = _coordinates(small.text())
         elif code == "pRT":
             details["rock_type"] = value or None
         elif code == "pH":
@@ -224,6 +233,17 @@ def _details(tree: HTMLParser) -> dict[str, Any]:
         elif code == "pRL":
             details["surroundings"] = value or None
     return details
+
+
+def _coordinates(text: str) -> tuple[float | None, float | None]:
+    """"lat , lng" → floats; anything unparsable → (None, None), the rock is then reported as without coordinates."""
+    parts = text.split(",")
+    if len(parts) != 2:
+        return None, None
+    try:
+        return float(parts[0]), float(parts[1])
+    except ValueError:
+        return None, None
 
 
 def _description(tree: HTMLParser) -> str | None:

@@ -10,7 +10,7 @@ from sqlalchemy_continuum import version_class
 from topo.importer.fetch import FetchError
 from topo.importer.portalgorski.parse import BASE_URL, PATHS_URL, START_URL
 from topo.importer.portalgorski.run import format_report, import_portalgorski
-from topo.models import Area, Crag, Route, RouteLine
+from topo.models import Area, Crag, Route, RouteLine, Wall
 
 FIXTURES = Path(__file__).parent / "fixtures" / "portalgorski"
 ZABI_URL = BASE_URL + "/Żabi-Koń,Grupa-Żabiego-Konia,Dolina-Kobylańska,Jura-Krakowsko-Częstochowska,skala,111"
@@ -24,6 +24,7 @@ class FakeFetcher:
     def __init__(self, failing: set[str] = frozenset()):
         self.failing = failing
         self.requests: list[str] = []
+        self.forgotten: list[tuple] = []
 
     def get(self, url):
         self.requests.append(url)
@@ -50,6 +51,9 @@ class FakeFetcher:
         assert url == PATHS_URL
         name = {"46": "paths46.json", "2533": "paths2533.json"}.get(data["imageId"])
         return (FIXTURES / name).read_bytes() if name else EMPTY_PATHS
+
+    def forget(self, method, url, data=None):
+        self.forgotten.append((method, url, dict(data or {})))
 
 
 def factory_for(session):
@@ -114,6 +118,8 @@ def test_format_report_is_polish(session, tmp_path):
     text = format_report(run(session, tmp_path))
     assert "Skały: 2 nowych" in text
     assert "Pominięte błędne adresy z listy skał (1)" in text
+    assert "Obszary: 4 nowych" in text
+    assert "Połączone duplikaty dróg: 0" in text
 
 
 class PatchedFetcher(FakeFetcher):
@@ -165,3 +171,28 @@ def test_empty_selection_is_logged(session, tmp_path):
     messages = []
     import_portalgorski(factory_for(session), FakeFetcher(), tmp_path, only_area="nigdzie", log=messages.append)
     assert "Brak skał pasujących do filtra" in messages
+
+
+class BrokenTopoFetcher(FakeFetcher):
+    def post(self, url, data):
+        if data["imageId"] == "46":
+            return json.dumps({"status": 0}).encode()
+        return super().post(url, data)
+
+
+def test_failed_topo_keeps_existing_lines_and_is_refetched(session, tmp_path):
+    run(session, tmp_path)
+    before = sorted(session.execute(
+        select(RouteLine.id, RouteLine.source_id).join(Wall).where(Wall.source_id == "46")
+    ).all())
+    assert len(before) == 9
+
+    fetcher = BrokenTopoFetcher()
+    report = run(session, tmp_path, fetcher)
+
+    after = sorted(session.execute(
+        select(RouteLine.id, RouteLine.source_id).join(Wall).where(Wall.source_id == "46")
+    ).all())
+    assert after == before
+    assert len(report.errors) == 1 and "topo" in report.errors[0] and "status 0" in report.errors[0]
+    assert fetcher.forgotten == [("POST", PATHS_URL, {"imageId": "46", "pathId": "0"})]

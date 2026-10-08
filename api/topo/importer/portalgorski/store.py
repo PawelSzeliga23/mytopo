@@ -18,7 +18,7 @@ from topo.importer.portalgorski.parse import KNOWN_POINT_KINDS
 from topo.importer.portalgorski.types import LineData, RockPage, WallRef, WallTopo
 from topo.media import InvalidImage, store_wall_image
 from topo.models import Area, Crag, LinePoint, Route, RouteLine, Wall
-from topo.slugs import unique_slug
+from topo.slugs import make_slug, unique_slug
 
 SOURCE = "portalgorski"
 IMPORT_AUTHOR = "import:portalgorski"
@@ -28,18 +28,20 @@ EDGE_TOLERANCE = 0.01
 @dataclass
 class WallInput:
     ref: WallRef
-    topo: WallTopo
+    topo: WallTopo | None  # None: topo unknown (fetch or parse failed), existing routes and lines stay untouched
     image: bytes | None
 
 
 @dataclass
 class ImportReport:
+    areas_created: int = 0
     crags_created: int = 0
     crags_updated: int = 0
     walls: int = 0
     routes: int = 0
     lines: int = 0
     points: int = 0
+    merged_routes: int = 0
     invalid_urls: list[str] = field(default_factory=list)
     skipped_manual: list[str] = field(default_factory=list)
     unknown_grades: list[str] = field(default_factory=list)
@@ -50,8 +52,8 @@ class ImportReport:
 
 def store_rock(session: Session, media_root: Path, page: RockPage, walls: list[WallInput], report: ImportReport) -> Crag:
     if page.lat is None or page.lng is None:
-        raise ValueError(f"Skała {page.name} nie ma współrzędnych")
-    area = _store_areas(session, page)
+        raise ValueError(f"Skała {page.name} bez współrzędnych, pominięto")
+    area = _store_areas(session, page, report)
     crag = _store_crag(session, page, area, report)
     for index, wall_input in enumerate(walls):
         _store_wall(session, Path(media_root), crag, index, wall_input, report)
@@ -78,7 +80,7 @@ def _assign(obj: Any, **fields: Any) -> bool:
     return changed
 
 
-def _store_areas(session: Session, page: RockPage) -> Area:
+def _store_areas(session: Session, page: RockPage, report: ImportReport) -> Area:
     parent: Area | None = None
     for item in page.path:
         source_id = f"{item.kind}:{item.source_id}"
@@ -93,7 +95,12 @@ def _store_areas(session: Session, page: RockPage) -> Area:
             )
             session.add(area)
             session.flush()
-        elif not is_manually_edited(session, Area, [area.id]):
+            report.areas_created += 1
+        elif is_manually_edited(session, Area, [area.id]):
+            entry = f"obszar {area.name}"
+            if entry not in report.skipped_manual:  # the same area is met once per rock
+                report.skipped_manual.append(entry)
+        else:
             _assign(area, name=item.name, source_url=item.url, parent_id=parent.id if parent else None)
         parent = area
     if parent is None:
@@ -167,11 +174,23 @@ def _store_wall(session: Session, media_root: Path, crag: Crag, index: int, wall
                 thumb_path=stored.thumb_path, image_width=stored.width, image_height=stored.height,
             )
 
-    routes = _store_routes(session, crag, wall_input.topo, report)
+    topo = wall_input.topo
+    if topo is None:  # topo unknown this run: keep what is stored
+        return
+    routes = _store_routes(session, crag, topo, report)
     if wall.image_width and wall.image_height:
-        _store_lines(session, label, wall, wall_input.topo, routes, report)
-    elif wall_input.topo.lines:
-        report.bad_lines.append(f"{label}: brak zdjęcia, pominięto {len(wall_input.topo.lines)} linii")
+        _store_lines(session, label, wall, topo, routes, report)
+    elif topo.lines:
+        report.bad_lines.append(f"{label}: brak zdjęcia, pominięto {len(topo.lines)} linii")
+
+
+def _same_route(session: Session, crag: Crag, name: str, grade: str | None, exclude: list[Route]) -> Route | None:
+    """The crag's stored route with the same normalized name and grade (the same route seen on another photo)."""
+    slug = make_slug(name)
+    for route in session.scalars(select(Route).where(Route.crag_id == crag.id).order_by(Route.id)):
+        if route.grade == grade and make_slug(route.name) == slug and all(route is not other for other in exclude):
+            return route
+    return None
 
 
 def _store_routes(session: Session, crag: Crag, topo: WallTopo, report: ImportReport) -> dict[int, Route]:
@@ -190,6 +209,11 @@ def _store_routes(session: Session, crag: Crag, topo: WallTopo, report: ImportRe
         if route is None:
             if _deleted_manually(session, Route, str(data.source_id)):
                 report.skipped_manual.append(f"usunięte ręcznie: droga {data.name} ({crag.name})")
+                continue
+            same = _same_route(session, crag, data.name, data.grade, list(routes.values()))
+            if same is not None:  # keeps its own source_id and number; this wall's line links to it
+                routes[data.source_id] = same
+                report.merged_routes += 1
                 continue
             route = Route(source=SOURCE, source_id=str(data.source_id), **fields)
             session.add(route)

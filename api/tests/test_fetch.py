@@ -78,3 +78,47 @@ def test_offline_mode_raises_cache_miss(tmp_path):
     fetcher, _ = make_fetcher(tmp_path, lambda r: httpx.Response(200), offline=True)
     with pytest.raises(CacheMiss):
         fetcher.get("https://example.org/a")
+
+
+def test_retries_too_many_requests_then_succeeds(tmp_path):
+    responses = iter([httpx.Response(429), httpx.Response(408), httpx.Response(200, content=b"ok")])
+    fetcher, sleeps = make_fetcher(tmp_path, lambda r: next(responses), delay=1.0)
+    assert fetcher.get("https://example.org/a") == b"ok"
+    assert sleeps == [2.0, 4.0]
+
+
+def test_retry_after_header_is_respected(tmp_path):
+    responses = iter([httpx.Response(429, headers={"Retry-After": "7"}), httpx.Response(200, content=b"ok")])
+    fetcher, sleeps = make_fetcher(tmp_path, lambda r: next(responses), delay=1.0)
+    assert fetcher.get("https://example.org/a") == b"ok"
+    assert 7 in sleeps
+
+
+def test_retry_after_shorter_than_backoff_uses_backoff(tmp_path):
+    responses = iter([httpx.Response(503, headers={"Retry-After": "1"}), httpx.Response(200, content=b"ok")])
+    fetcher, sleeps = make_fetcher(tmp_path, lambda r: next(responses), delay=1.5)
+    assert fetcher.get("https://example.org/a") == b"ok"
+    assert sleeps == [3.0]
+
+
+def test_forget_drops_cached_response(tmp_path):
+    calls = []
+
+    def handler(request):
+        calls.append(1)
+        return httpx.Response(200, content=b"x")
+
+    fetcher, _ = make_fetcher(tmp_path, handler)
+    data = {"imageId": "46", "pathId": "0"}
+    fetcher.post("https://example.org/p", data)
+    fetcher.forget("POST", "https://example.org/p", data)
+    assert not fetcher.cache_path("POST", "https://example.org/p", data).exists()
+    fetcher.forget("POST", "https://example.org/p", data)  # brak pliku to nie błąd
+    fetcher.post("https://example.org/p", data)
+    assert len(calls) == 2
+
+
+def test_cache_write_leaves_no_partial_files(tmp_path):
+    fetcher, _ = make_fetcher(tmp_path, lambda r: httpx.Response(200, content=b"x"))
+    fetcher.get("https://example.org/a")
+    assert [p for p in tmp_path.rglob("*") if p.is_file()] == [fetcher.cache_path("GET", "https://example.org/a")]

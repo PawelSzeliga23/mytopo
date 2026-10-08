@@ -14,13 +14,15 @@ from topo.db import refresh_area_geom
 from topo.history import set_author
 from topo.importer.portalgorski.parse import PATHS_URL, START_URL, parse_paths, parse_rock_page, parse_start
 from topo.importer.portalgorski.store import IMPORT_AUTHOR, ImportReport, WallInput, store_rock
-from topo.importer.portalgorski.types import RockRef
+from topo.importer.portalgorski.types import RockRef, WallTopo
 
 
 class Fetcher(Protocol):
     def get(self, url: str) -> bytes: ...
 
     def post(self, url: str, data: Mapping[str, str]) -> bytes: ...
+
+    def forget(self, method: str, url: str, data: Mapping[str, str] | None = None) -> None: ...
 
 
 def import_portalgorski(
@@ -81,11 +83,20 @@ def _select(rocks: list[RockRef], only_area: str | None, limit: int | None) -> l
 
 def _fetch_wall(fetcher: Fetcher, rock: RockRef, ref, report: ImportReport) -> WallInput:
     label = f"{rock.name} / {ref.name or ref.source_id}"
+    data = {"imageId": str(ref.source_id), "pathId": "0"}
+    topo: WallTopo | None
     try:
-        topo = parse_paths(fetcher.post(PATHS_URL, {"imageId": str(ref.source_id), "pathId": "0"}))
+        raw = fetcher.post(PATHS_URL, data)
     except Exception as exc:
         report.errors.append(f"{label}: topo: {exc}")
-        topo = parse_paths(b'{"status": 0}')
+        topo = None
+    else:
+        try:
+            topo = parse_paths(raw)
+        except Exception as exc:
+            report.errors.append(f"{label}: topo: {exc}")
+            fetcher.forget("POST", PATHS_URL, data)  # do not keep a rejected answer; the next run asks again
+            topo = None
     image = None
     if ref.image_url:
         try:
@@ -97,8 +108,10 @@ def _fetch_wall(fetcher: Fetcher, rock: RockRef, ref, report: ImportReport) -> W
 
 def format_report(report: ImportReport) -> str:
     lines = [
+        f"Obszary: {report.areas_created} nowych",
         f"Skały: {report.crags_created} nowych, {report.crags_updated} zaktualizowanych",
         f"Ściany: {report.walls}, drogi: {report.routes}, linie: {report.lines}, punkty: {report.points}",
+        f"Połączone duplikaty dróg: {report.merged_routes}",
     ]
     sections = [
         ("Pominięte błędne adresy z listy skał", report.invalid_urls),

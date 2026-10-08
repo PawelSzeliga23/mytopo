@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 
 import typer
@@ -21,9 +22,16 @@ def import_portalgorski_command(
     limit: int | None = typer.Option(None, "--limit", help="Najwyżej tyle skał"),
     offline: bool = typer.Option(False, "--offline", help="Tylko z cache, bez sieci"),
     delay: float = typer.Option(1.5, "--delay", help="Przerwa między zapytaniami [s]"),
+    report_path: Path | None = typer.Option(
+        None, "--report",
+        help="Plik na raport (domyślnie /data/cache/import-portalgorski-<data>-<godzina>.txt)",
+    ),
 ) -> None:
     """Importuje skały, ściany, zdjęcia i drogi z topo.portalgorski.pl."""
     settings = get_settings()
+    if report_path is None:
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        report_path = Path(settings.cache_dir) / f"import-portalgorski-{stamp}.txt"
     fetcher = CachedFetcher(Path(settings.cache_dir) / "portalgorski", delay=delay, offline=offline)
     report = ImportReport()
     try:
@@ -33,12 +41,22 @@ def import_portalgorski_command(
         )
     except KeyboardInterrupt:
         typer.echo("Przerwano — zapisane skały zostają, ponowne uruchomienie dokończy z cache.")
-        typer.echo(format_report(report))
+        _finish(report, report_path)
         raise typer.Exit(130)
     except FetchError as exc:
         typer.echo(f"Błąd pobierania: {exc}", err=True)
+        report.errors.append(f"Błąd pobierania: {exc}")
+        _finish(report, report_path)
         raise typer.Exit(1)
-    typer.echo(format_report(report))
+    _finish(report, report_path)
+
+
+def _finish(report: ImportReport, path: Path) -> None:
+    text = format_report(report)
+    typer.echo(text)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text + "\n", encoding="utf-8")
+    typer.echo(f"Raport zapisano w {path}")
 
 
 @app.command("draw-wall")

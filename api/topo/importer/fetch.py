@@ -1,6 +1,7 @@
 """HTTP fetching with an on-disk cache, polite delays between requests and retries."""
 
 import hashlib
+import os
 import time
 from collections.abc import Callable, Mapping
 from pathlib import Path
@@ -8,6 +9,7 @@ from pathlib import Path
 import httpx
 
 DEFAULT_USER_AGENT = "topo-importer/0.1 (prywatne, niekomercyjne wiki topo)"
+RETRYABLE_STATUSES = frozenset({408, 429})
 
 
 class FetchError(Exception):
@@ -45,6 +47,10 @@ class CachedFetcher:
     def post(self, url: str, data: Mapping[str, str]) -> bytes:
         return self._fetch("POST", url, data)
 
+    def forget(self, method: str, url: str, data: Mapping[str, str] | None = None) -> None:
+        """Drop a cached response the caller rejected, so the next run downloads it again."""
+        self.cache_path(method, url, data).unlink(missing_ok=True)
+
     def cache_path(self, method: str, url: str, data: Mapping[str, str] | None = None) -> Path:
         key = f"{method} {url}"
         if data:
@@ -60,7 +66,7 @@ class CachedFetcher:
             raise CacheMiss(f"Brak w cache: {method} {url}")
         body = self._download(method, url, data)
         path.parent.mkdir(parents=True, exist_ok=True)
-        partial = path.with_suffix(".part")
+        partial = path.with_suffix(f".{os.getpid()}.part")
         partial.write_bytes(body)
         partial.replace(path)
         return body
@@ -71,6 +77,7 @@ class CachedFetcher:
             if self._requested:
                 self.sleep(self.delay)
             self._requested = True
+            retry_after: float | None = None
             try:
                 response = self.client.request(method, url, data=data)
             except httpx.TransportError as exc:
@@ -78,10 +85,17 @@ class CachedFetcher:
             else:
                 if response.status_code < 400:
                     return response.content
-                if response.status_code < 500:
+                if response.status_code < 500 and response.status_code not in RETRYABLE_STATUSES:
                     raise FetchError(f"HTTP {response.status_code}: {method} {url}")
                 error = FetchError(f"HTTP {response.status_code}: {method} {url}")
+                retry_after = _retry_after(response)
             if attempt + 1 < self.retries:
-                self.sleep(self.delay * 2 ** (attempt + 1))
+                backoff = self.delay * 2 ** (attempt + 1)
+                self.sleep(max(retry_after, backoff) if retry_after is not None else backoff)
                 self._requested = False
         raise error
+
+
+def _retry_after(response: httpx.Response) -> float | None:
+    value = (response.headers.get("Retry-After") or "").strip()
+    return float(value) if value.isdigit() else None

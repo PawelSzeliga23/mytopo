@@ -99,7 +99,7 @@ depth_job      id, wall_id, model, status {queued|running|done|failed}, error, c
 ```
 
 - Wszystkie tabele treści (`area`, `crag`, `wall`, `route`, `route_line`, `line_point`) mają `source` (`portalgorski` | `wspinanie` | `manual`), `source_id`, `source_url`. Unikalny klucz `(source, source_id)` pozwala powtarzać import bez duplikatów.
-- Droga (`route`) jest odrębna od jej linii na zdjęciu (`route_line`), więc jedna droga może występować na kilku zdjęciach.
+- Droga (`route`) jest odrębna od jej linii na zdjęciu (`route_line`), więc jedna droga może występować na kilku zdjęciach. Ta sama droga widoczna na kilku zdjęciach to jeden rekord `route` z kilkoma `route_line`; import łączy drogi tej samej skały o tej samej nazwie (po normalizacji) i wycenie. Numer drogi na topo wynika z kolejności linii na danym zdjęciu.
 - Środki i obrysy regionów i sektorów nie są przechowywane, tylko liczone z położenia skał: widok zmaterializowany `area_geom` (środek: ST_Centroid; obrys: ST_ConvexHull z buforem 50 m, co zawsze daje poligon — również dla sektora z jedną lub dwiema skałami). Odświeżany po imporcie i edycjach.
 - Skała może należeć bezpośrednio do regionu (bez sektora).
 - `grade_sort`: odwzorowanie skali krakowskiej (I … VI.8, z „+”, „-” i wycenami łamanymi typu „VI.1+/2”) na liczbę całkowitą rosnącą z trudnością. Wycena łamana dostaje wartość między sąsiednimi. Nieznana wycena → `NULL`, a import zgłasza ją w raporcie.

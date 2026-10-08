@@ -4,11 +4,12 @@ from pathlib import Path
 import pytest
 from PIL import Image
 from sqlalchemy import func, select
+from sqlalchemy_continuum import version_class
 
 from topo.history import set_author
 from topo.importer.portalgorski.parse import parse_paths, parse_rock_page
 from topo.importer.portalgorski.store import IMPORT_AUTHOR, ImportReport, WallInput, store_rock
-from topo.importer.portalgorski.types import WallTopo
+from topo.importer.portalgorski.types import LineData, PointData, RouteData, WallTopo
 from topo.models import Area, Crag, LinePoint, Route, RouteLine, Wall
 
 FIXTURES = Path(__file__).parent / "fixtures" / "portalgorski"
@@ -106,7 +107,7 @@ def test_line_outside_image_is_skipped(session, tmp_path):
 
 
 def test_unknown_grade_and_point_kind_are_reported(session, tmp_path):
-    raw = load("paths2533.json").replace(b"VI.3+", b"6a+").replace(b"ogranicznik", b"spit")
+    raw = load("paths2533.json").replace(b"VI.3+", b"6a+").replace(b"ogranicznik", b"kolec")
     page = parse_rock_page(load("skala955.html"))
     report = ImportReport()
     set_author(session, IMPORT_AUTHOR)
@@ -186,3 +187,93 @@ def test_page_without_coordinates_creates_nothing(session, tmp_path):
     with pytest.raises(ValueError):
         store_rock(session, tmp_path, page, [], ImportReport())
     assert session.scalar(select(func.count()).select_from(Area)) == 0
+
+
+def test_unknown_topo_keeps_existing_lines(session, tmp_path):
+    crag, _ = import_zabi(session, tmp_path)
+    before = sorted((line.id, line.source_id) for line in crag.walls[1].lines)
+    assert len(before) == 9
+
+    page = parse_rock_page(load("skala111.html"))
+    walls = [
+        WallInput(ref=ref, topo=None if ref.source_id == 46 else WallTopo(lines=[], routes=[]), image=jpeg(SIZES[ref.source_id]))
+        for ref in page.walls
+    ]
+    report = ImportReport()
+    set_author(session, IMPORT_AUTHOR)
+    store_rock(session, tmp_path, page, walls, report)
+    session.commit()
+
+    session.expire_all()
+    wall46 = session.scalar(select(Wall).where(Wall.source_id == "46"))
+    assert sorted((line.id, line.source_id) for line in wall46.lines) == before
+    assert len(crag.routes) == 9
+    assert report.errors == []
+
+
+def _wall45_with_kant() -> WallTopo:
+    return WallTopo(
+        lines=[
+            LineData(
+                source_id=90287, order=3, branch_order=0, color="#e11d48", parent_source_id=None, parent_point_source_id=None,
+                points=[
+                    PointData(source_id=990001, x=400, y=1000, kind="start", visible=False, raw_kind="ring"),
+                    PointData(source_id=990002, x=420, y=100, kind="stanowisko", visible=True, raw_kind="stanowisko"),
+                ],
+            )
+        ],
+        routes=[
+            RouteData(
+                source_id=90287, name="Lewy kant Żabiego Konia", protection="9r + ST", grade="V+",
+                first_ascent=None, year=1972, length_m=25.0,
+            )
+        ],
+    )
+
+
+def _import_two_walls(session, tmp_path):
+    page = parse_rock_page(load("skala111.html"))
+    report = ImportReport()
+    set_author(session, IMPORT_AUTHOR)
+    paths = {45: _wall45_with_kant(), 46: parse_paths(load("paths46.json"))}
+    crag = store_rock(session, tmp_path, page, wall_inputs(page, paths), report)
+    session.commit()
+    return crag, report
+
+
+def test_same_route_on_two_walls_is_one_route(session, tmp_path):
+    crag, report = _import_two_walls(session, tmp_path)
+
+    kants = session.scalars(select(Route).where(Route.crag_id == crag.id, Route.name == "Lewy kant Żabiego Konia")).all()
+    assert len(kants) == 1
+    [kant] = kants
+    assert (kant.source_id, kant.number) == ("90287", 3)  # pierwsza ściana (45) zakłada drogę
+    kant_lines = session.scalars(select(RouteLine).where(RouteLine.route_id == kant.id)).all()
+    assert sorted(line.wall.source_id for line in kant_lines) == ["45", "46"]
+    assert report.merged_routes == 1
+    assert len(crag.routes) == 9
+    assert session.scalar(select(Route).where(Route.source_id == "287")) is None
+
+    versions = {
+        model: session.scalar(select(func.count()).select_from(version_class(model)))
+        for model in (Route, RouteLine, LinePoint)
+    }
+    _, again = _import_two_walls(session, tmp_path)
+    assert again.merged_routes == 1
+    assert {
+        model: session.scalar(select(func.count()).select_from(version_class(model)))
+        for model in (Route, RouteLine, LinePoint)
+    } == versions
+
+
+def test_reimport_counts_areas_and_reports_manual_area(session, tmp_path):
+    crag, report = import_zabi(session, tmp_path)
+    assert report.areas_created == 3
+
+    set_author(session, "Ola", "poprawka obszaru")
+    crag.area.name = "Grupa Żabiego Konia (poprawiona)"
+    session.commit()
+
+    _, again = import_zabi(session, tmp_path)
+    assert again.areas_created == 0
+    assert "obszar Grupa Żabiego Konia (poprawiona)" in again.skipped_manual

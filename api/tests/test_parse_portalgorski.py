@@ -105,9 +105,16 @@ def test_parse_paths_ogranicznik():
     assert (route.source_id, route.name, route.grade, route.length_m) == (13565, "Droga krzyżowa", "VI.3+", 11.0)
 
 
-def test_parse_paths_failed_status_is_empty():
-    topo = parse_paths(b'{"status": 0, "message": "brak"}')
-    assert topo.lines == [] and topo.routes == []
+def test_parse_paths_failed_status_raises():
+    with pytest.raises(ValueError, match="Portal zwrócił status 0 dla topo"):
+        parse_paths(b'{"status": 0, "message": "brak"}')
+
+
+@pytest.mark.parametrize("gps", ["brak danych", "49.8 ; 20.1", "49,8 , 20,1"])
+def test_parse_rock_page_unparsable_gps_leaves_no_coordinates(gps):
+    raw = load("skala955.html").replace(b"49.80255900000 , 20.16932900000", gps.encode())
+    page = parse_rock_page(raw)
+    assert (page.lat, page.lng) == (None, None)
 
 
 @pytest.mark.parametrize(
@@ -118,7 +125,13 @@ def test_parse_paths_failed_status_is_empty():
         (" hak", 2, 3, ("hak", True)),
         ("dwa ringi zjazdowe", 2, 5, ("stanowisko", True)),
         ("stanowisko zjazdowe", 1, 5, ("stanowisko", False)),
-        ("spit", 2, 2, ("przelot", True)),
+        ("spit", 2, 2, ("ring", True)),
+        ("ring zjazdowy", 2, 6, ("stanowisko", True)),
+        ("Pętla", 2, 4, ("ucho", True)),
+        ("niewidoczny fragment drogi", 2, 3, ("przelot", False)),
+        ("niewidoczny fragment drogi", 1, 3, ("przelot", False)),
+        ("kolec", 2, 3, ("przelot", False)),
+        ("", 2, 3, ("przelot", False)),
     ],
 )
 def test_map_point(kind_name, type_id, index, expected):
