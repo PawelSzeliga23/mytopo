@@ -2120,7 +2120,7 @@ Decyzje podjęte podczas wykonania (po przeglądach):
 - Historia: własny `_TopoUnitOfWork` (Continuum zapisuje wersje w transakcji wywołującego) — zależy od wnętrza Continuum 1.8.
 
 Do zrobienia przed pełnym importem (~635 skał):
-- Nie łączyć dróg bez wyceny (np. „projekt”) między ścianami — dziś jeden taki przypadek (Czarna Ścianka).
+- ~~Nie łączyć dróg bez wyceny~~ — zrobione (commit po planie 2).
 
 Do zdecydowania w kolejnych planach:
 - **Plan 5 (głębia):** zapisy workera głębi do `wall` podpisywać autorem z prefiksem `import:` (np. `import:depth`) albo wyłączyć `depth_*` z wersjonowania (`__versioned__ = {"exclude": [...]}`) — inaczej ściany wyglądają na „ręcznie edytowane” i import przestaje je aktualizować.

@@ -266,6 +266,42 @@ def test_same_route_on_two_walls_is_one_route(session, tmp_path):
     } == versions
 
 
+def test_ungraded_routes_on_two_walls_are_not_merged(session, tmp_path):
+    page = parse_rock_page(load("skala111.html"))
+    report = ImportReport()
+    set_author(session, IMPORT_AUTHOR)
+    paths = {
+        45: _ungraded_project(90001, 991001),
+        46: _ungraded_project(90002, 991101),
+    }
+    crag = store_rock(session, tmp_path, page, wall_inputs(page, paths), report)
+    session.commit()
+
+    projects = session.scalars(select(Route).where(Route.crag_id == crag.id, Route.name == "projekt")).all()
+    assert len(projects) == 2
+    assert report.merged_routes == 0
+
+
+def _ungraded_project(path_id: int, first_point_id: int) -> WallTopo:
+    return WallTopo(
+        lines=[
+            LineData(
+                source_id=path_id, order=1, branch_order=0, color="#e11d48", parent_source_id=None, parent_point_source_id=None,
+                points=[
+                    PointData(source_id=first_point_id, x=400, y=1000, kind="start", visible=False, raw_kind="ring"),
+                    PointData(source_id=first_point_id + 1, x=420, y=100, kind="stanowisko", visible=True, raw_kind="stanowisko"),
+                ],
+            )
+        ],
+        routes=[
+            RouteData(
+                source_id=path_id, name="projekt", protection=None, grade=None,
+                first_ascent=None, year=None, length_m=None,
+            )
+        ],
+    )
+
+
 def test_reimport_counts_areas_and_reports_manual_area(session, tmp_path):
     crag, report = import_zabi(session, tmp_path)
     assert report.areas_created == 3

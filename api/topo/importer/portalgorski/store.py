@@ -185,7 +185,12 @@ def _store_wall(session: Session, media_root: Path, crag: Crag, index: int, wall
 
 
 def _same_route(session: Session, crag: Crag, name: str, grade: str | None, exclude: list[Route]) -> Route | None:
-    """The crag's stored route with the same normalized name and grade (the same route seen on another photo)."""
+    """The crag's stored route with the same normalized name and grade (the same route seen on another photo).
+
+    Routes without a grade (e.g. "projekt") are never merged: the name alone does not identify them.
+    """
+    if not grade:
+        return None
     slug = make_slug(name)
     for route in session.scalars(select(Route).where(Route.crag_id == crag.id).order_by(Route.id)):
         if route.grade == grade and make_slug(route.name) == slug and all(route is not other for other in exclude):

@@ -11,7 +11,7 @@ Prywatne, niekomercyjne wiki topo dróg wspinaczkowych dla autora i znajomych.
 - Dane startowe importowane z Portalu Górskiego (topo.portalgorski.pl), uzupełniane z wspinanie.pl.
 - Brak kont. Oglądanie publiczne, edycja po jednym wspólnym haśle, każda zmiana podpisana nickiem i zapisana w historii z możliwością cofnięcia.
 - Stack: React (front), FastAPI (API), Postgres + PostGIS (baza). Maksymalne użycie gotowych bibliotek.
-- Uruchamiane lokalnie przez Docker Compose; produkcyjnie autor przenosi obrazy na własny serwer (bez GPU) i wystawia przez tunel.
+- Uruchamiane lokalnie przez Docker Compose; produkcyjnie na własnym serwerze autora (bez GPU), w tej samej sieci domowej (ten sam router), wystawiane przez tunel. Na serwerze działa **osobny, nowy kontener Postgres + PostGIS** tylko dla Topo (nie istniejąca baza autora). `media/` przenoszone po sieci lokalnej (tar przez SSH, potem rsync dla zmian), baza przez `pg_dump` / `pg_restore`; szczegóły w planie 9.
 
 **Kryteria sukcesu**
 1. Po imporcie mapa pokazuje wszystkie skały z Portalu Górskiego z trzema poziomami przybliżenia (region → sektor → skała).
@@ -99,7 +99,7 @@ depth_job      id, wall_id, model, status {queued|running|done|failed}, error, c
 ```
 
 - Wszystkie tabele treści (`area`, `crag`, `wall`, `route`, `route_line`, `line_point`) mają `source` (`portalgorski` | `wspinanie` | `manual`), `source_id`, `source_url`. Unikalny klucz `(source, source_id)` pozwala powtarzać import bez duplikatów.
-- Droga (`route`) jest odrębna od jej linii na zdjęciu (`route_line`), więc jedna droga może występować na kilku zdjęciach. Ta sama droga widoczna na kilku zdjęciach to jeden rekord `route` z kilkoma `route_line`; import łączy drogi tej samej skały o tej samej nazwie (po normalizacji) i wycenie. Numer drogi na topo wynika z kolejności linii na danym zdjęciu.
+- Droga (`route`) jest odrębna od jej linii na zdjęciu (`route_line`), więc jedna droga może występować na kilku zdjęciach. Ta sama droga widoczna na kilku zdjęciach to jeden rekord `route` z kilkoma `route_line`; import łączy drogi tej samej skały o tej samej nazwie (po normalizacji) i wycenie (drogi bez wyceny, np. „projekt”, nie są łączone). Numer drogi na topo wynika z kolejności linii na danym zdjęciu.
 - Środki i obrysy regionów i sektorów nie są przechowywane, tylko liczone z położenia skał: widok zmaterializowany `area_geom` (środek: ST_Centroid; obrys: ST_ConvexHull z buforem 50 m, co zawsze daje poligon — również dla sektora z jedną lub dwiema skałami). Odświeżany po imporcie i edycjach.
 - Skała może należeć bezpośrednio do regionu (bez sektora).
 - `grade_sort`: odwzorowanie skali krakowskiej (I … VI.8, z „+”, „-” i wycenami łamanymi typu „VI.1+/2”) na liczbę całkowitą rosnącą z trudnością. Wycena łamana dostaje wartość między sąsiednimi. Nieznana wycena → `NULL`, a import zgłasza ją w raporcie.
