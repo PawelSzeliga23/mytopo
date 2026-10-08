@@ -7,3 +7,5 @@ node_modules/
 /cache/
 /media/
 /out/
+
+web/dist/

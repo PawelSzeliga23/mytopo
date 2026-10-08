@@ -33,3 +33,13 @@ docker compose run --rm api topo draw-wall 1 /data/cache/podglad-1.png          
 ```
 
 Surowe odpowiedzi trafiają do `./cache/`, zdjęcia do `./media/`. Ponowne uruchomienie korzysta z cache i nie nadpisuje ręcznych poprawek.
+
+## Front
+
+```powershell
+docker compose up -d api        # API na :8000
+cd web
+npm install
+npm run dev                     # http://localhost:5173
+npm test                        # testy
+```
