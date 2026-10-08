@@ -136,3 +136,53 @@ def _chain(area):
         chain.append(area)
         area = area.parent
     return list(reversed(chain))
+
+
+def _reimport_after_manual(session, tmp_path, action):
+    crag, _ = import_zabi(session, tmp_path)
+    set_author(session, "Ola", "usunięcie")
+    action(crag)
+    session.commit()
+    return import_zabi(session, tmp_path)
+
+
+def test_manually_deleted_route_is_not_recreated(session, tmp_path):
+    def action(crag):
+        session.delete(next(r for r in crag.routes if r.source_id == "287"))
+
+    crag, report = _reimport_after_manual(session, tmp_path, action)
+    assert session.scalar(select(Route).where(Route.source_id == "287")) is None
+    assert any("usunięte ręcznie: droga" in item for item in report.skipped_manual)
+
+
+def test_manually_deleted_line_freezes_wall_topo(session, tmp_path):
+    def action(crag):
+        session.delete(next(line for line in crag.walls[1].lines if line.source_id == "290"))
+
+    crag, report = _reimport_after_manual(session, tmp_path, action)
+    wall46 = crag.walls[1]
+    assert session.scalar(select(RouteLine).where(RouteLine.source_id == "290")) is None
+    assert len(wall46.lines) == 8
+    assert any("topo ściany" in item for item in report.skipped_manual)
+
+
+def test_manually_deleted_point_is_not_recreated(session, tmp_path):
+    def action(crag):
+        line = next(line for line in crag.walls[1].lines if line.source_id == "287")
+        assert len(line.points) == 11
+        session.delete(line.points[-1])
+
+    crag, _ = _reimport_after_manual(session, tmp_path, action)
+    line = next(line for line in crag.walls[1].lines if line.source_id == "287")
+    session.refresh(line)
+    assert len(line.points) == 10
+
+
+def test_page_without_coordinates_creates_nothing(session, tmp_path):
+    from dataclasses import replace
+
+    page = replace(parse_rock_page(load("skala111.html")), lat=None)
+    set_author(session, IMPORT_AUTHOR)
+    with pytest.raises(ValueError):
+        store_rock(session, tmp_path, page, [], ImportReport())
+    assert session.scalar(select(func.count()).select_from(Area)) == 0

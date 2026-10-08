@@ -68,15 +68,20 @@ def transaction_class() -> type:
     return versioning_manager.transaction_cls
 
 
+def has_manual_version(session: Session, model: type, *conditions) -> bool:
+    """True if any version row of ``model`` matching ``conditions`` was written by someone other than an importer.
+
+    Conditions are built on the version class columns (``version_class(model)``).
+    """
+    transaction = transaction_class()
+    manual = sa.or_(transaction.author.is_(None), sa.not_(transaction.author.startswith(IMPORT_AUTHOR_PREFIX)))
+    stmt = sa.select(sa.exists().where(version_class(model).transaction_id == transaction.id, manual, *conditions))
+    return bool(session.scalar(stmt))
+
+
 def is_manually_edited(session: Session, model: type, ids: Iterable[int]) -> bool:
     """True if any version of the given rows was written by someone other than an importer."""
     ids = list(ids)
     if not ids:
         return False
-    version = version_class(model)
-    transaction = transaction_class()
-    manual = sa.or_(transaction.author.is_(None), sa.not_(transaction.author.startswith(IMPORT_AUTHOR_PREFIX)))
-    stmt = sa.select(
-        sa.exists().where(version.id.in_(ids), version.transaction_id == transaction.id, manual)
-    )
-    return bool(session.scalar(stmt))
+    return has_manual_version(session, model, version_class(model).id.in_(ids))

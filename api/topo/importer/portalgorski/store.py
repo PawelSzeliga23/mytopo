@@ -6,11 +6,14 @@ from typing import Any
 
 from geoalchemy2 import WKTElement
 from geoalchemy2.shape import to_shape
+import sqlalchemy as sa
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from topo.grades import grade_sort
-from topo.history import is_manually_edited
+from sqlalchemy_continuum import version_class
+
+from topo.history import has_manual_version, is_manually_edited
 from topo.importer.portalgorski.parse import KNOWN_POINT_KINDS
 from topo.importer.portalgorski.types import LineData, RockPage, WallRef, WallTopo
 from topo.media import InvalidImage, store_wall_image
@@ -46,12 +49,20 @@ class ImportReport:
 
 
 def store_rock(session: Session, media_root: Path, page: RockPage, walls: list[WallInput], report: ImportReport) -> Crag:
+    if page.lat is None or page.lng is None:
+        raise ValueError(f"Skała {page.name} nie ma współrzędnych")
     area = _store_areas(session, page)
     crag = _store_crag(session, page, area, report)
     for index, wall_input in enumerate(walls):
         _store_wall(session, Path(media_root), crag, index, wall_input, report)
     session.flush()
     return crag
+
+
+def _deleted_manually(session: Session, model: type, source_id: str) -> bool:
+    """True if a person deleted (or otherwise manually versioned) the row that this source id maps to."""
+    version = version_class(model)
+    return has_manual_version(session, model, version.source == SOURCE, version.source_id == source_id)
 
 
 def _find(session: Session, model: type, source_id: str) -> Any:
@@ -73,6 +84,8 @@ def _store_areas(session: Session, page: RockPage) -> Area:
         source_id = f"{item.kind}:{item.source_id}"
         area = _find(session, Area, source_id)
         if area is None:
+            if _deleted_manually(session, Area, source_id):
+                raise ValueError(f"Obszar {item.name} został usunięty ręcznie; pominięto skałę {page.name}")
             context = [parent.name] if parent is not None else []
             area = Area(
                 source=SOURCE, source_id=source_id, kind=item.kind, name=item.name,
@@ -89,8 +102,6 @@ def _store_areas(session: Session, page: RockPage) -> Area:
 
 
 def _store_crag(session: Session, page: RockPage, area: Area, report: ImportReport) -> Crag:
-    if page.lat is None or page.lng is None:
-        raise ValueError(f"Skała {page.name} nie ma współrzędnych")
     fields = dict(
         area_id=area.id, name=page.name, source_url=page.url, rock_type=page.rock_type,
         height_min=page.height_min, height_max=page.height_max, aspects=page.aspects,
@@ -99,6 +110,8 @@ def _store_crag(session: Session, page: RockPage, area: Area, report: ImportRepo
     )
     crag = _find(session, Crag, str(page.source_id))
     if crag is None:
+        if _deleted_manually(session, Crag, str(page.source_id)):
+            raise ValueError(f"Skała {page.name} została usunięta ręcznie; pominięto import")
         context = [item.name for item in reversed(page.path)]
         crag = Crag(
             source=SOURCE, source_id=str(page.source_id), slug=unique_slug(session, Crag, page.name, context),
@@ -131,6 +144,9 @@ def _store_wall(session: Session, media_root: Path, crag: Crag, index: int, wall
     fields = dict(crag_id=crag.id, name=ref.name, description=ref.description, sort_order=index, source_url=ref.image_url)
     wall = _find(session, Wall, str(ref.source_id))
     if wall is None:
+        if _deleted_manually(session, Wall, str(ref.source_id)):
+            report.skipped_manual.append(f"usunięte ręcznie: ściana {label}")
+            return
         wall = Wall(source=SOURCE, source_id=str(ref.source_id), **fields)
         session.add(wall)
         session.flush()
@@ -172,6 +188,9 @@ def _store_routes(session: Session, crag: Crag, topo: WallTopo, report: ImportRe
         )
         route = _find(session, Route, str(data.source_id))
         if route is None:
+            if _deleted_manually(session, Route, str(data.source_id)):
+                report.skipped_manual.append(f"usunięte ręcznie: droga {data.name} ({crag.name})")
+                continue
             route = Route(source=SOURCE, source_id=str(data.source_id), **fields)
             session.add(route)
         elif is_manually_edited(session, Route, [route.id]):
@@ -187,8 +206,13 @@ def _store_routes(session: Session, crag: Crag, topo: WallTopo, report: ImportRe
 def _store_lines(session: Session, label: str, wall: Wall, topo: WallTopo, routes: dict[int, Route], report: ImportReport) -> None:
     existing = session.scalars(select(RouteLine).where(RouteLine.wall_id == wall.id)).all()
     point_ids = [point.id for line in existing for point in line.points]
-    if is_manually_edited(session, RouteLine, [line.id for line in existing]) or is_manually_edited(
-        session, LinePoint, point_ids
+    line_version, point_version = version_class(RouteLine), version_class(LinePoint)
+    wall_line_ids = sa.select(line_version.id).where(line_version.wall_id == wall.id)
+    if (
+        is_manually_edited(session, RouteLine, [line.id for line in existing])
+        or is_manually_edited(session, LinePoint, point_ids)
+        or has_manual_version(session, RouteLine, line_version.wall_id == wall.id)
+        or has_manual_version(session, LinePoint, point_version.line_id.in_(wall_line_ids))
     ):
         report.skipped_manual.append(f"topo ściany {label}")
         return
@@ -202,6 +226,9 @@ def _store_lines(session: Session, label: str, wall: Wall, topo: WallTopo, route
             continue
         line = _find(session, RouteLine, str(data.source_id))
         if line is None:
+            if _deleted_manually(session, RouteLine, str(data.source_id)):
+                report.skipped_manual.append(f"usunięte ręcznie: linia {data.source_id} ({label})")
+                continue
             line = RouteLine(source=SOURCE, source_id=str(data.source_id))
             session.add(line)
         _assign(
@@ -214,6 +241,9 @@ def _store_lines(session: Session, label: str, wall: Wall, topo: WallTopo, route
                 report.unknown_point_kinds.append(f"{label}: {point_data.raw_kind}")
             point = _find(session, LinePoint, str(point_data.source_id))
             if point is None:
+                if _deleted_manually(session, LinePoint, str(point_data.source_id)):
+                    report.skipped_manual.append(f"usunięte ręcznie: punkt {point_data.source_id} ({label})")
+                    continue
                 point = LinePoint(source=SOURCE, source_id=str(point_data.source_id))
                 session.add(point)
             _assign(point, line=line, sort_order=index, x=x, y=y, kind=point_data.kind, visible=point_data.visible)
