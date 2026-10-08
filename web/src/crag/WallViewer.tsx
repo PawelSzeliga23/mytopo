@@ -52,14 +52,15 @@ function Segmented<T extends string>({ label, value, options, onChange }: {
 }
 
 /**
- * One wall with its routes: the 2.5D model by default (ready depth map, rock not overgrown, WebGL available),
- * otherwise the photo. A failed photo or model shows a message and leaves the rest of the page working.
+ * One wall with its routes: the photo by default, the 2.5D model on request (ready depth map and WebGL available).
+ * A failed photo or model shows a message and leaves the rest of the page working.
  */
 export function WallViewer({ wall, className = "", style, ...canvas }: WallViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const size = useElementSize(containerRef);
   const can3d = Boolean(wall.depth_url) && hasWebGL();
-  const [mode, setMode] = useState<Mode>(can3d && wall.show_3d ? "3d" : "2d");
+  // Every wall opens the same way, as the photo; the 2.5D model is one click away in the corner.
+  const [mode, setMode] = useState<Mode>("2d");
   const [look, setLook] = useState<Look>("holo");
   const [relief, setRelief] = useState(0.25);
   const [failed, setFailed] = useState(false);
@@ -94,7 +95,7 @@ export function WallViewer({ wall, className = "", style, ...canvas }: WallViewe
       )}
       {can3d && (
         <div className="absolute right-2 top-2 z-10 flex flex-col items-end gap-1.5">
-          <Segmented label="Widok ściany" value={mode} onChange={setMode} options={[{ value: "3d", text: "2.5D" }, { value: "2d", text: "2D" }]} />
+          <Segmented label="Widok ściany" value={mode} onChange={setMode} options={[{ value: "2d", text: "2D" }, { value: "3d", text: "2.5D" }]} />
           {mode === "3d" && (
             <>
               <Segmented label="Wygląd modelu" value={look} onChange={setLook} options={[{ value: "holo", text: "hologram" }, { value: "photo", text: "zdjęcie" }]} />
