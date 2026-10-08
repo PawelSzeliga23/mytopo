@@ -1,6 +1,8 @@
 """Static gallery for judging depth maps: photo with lines, coloured depth, relief shading and a 2.5D viewer."""
 
 import html
+import json
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -56,6 +58,20 @@ def _small(image: Image.Image) -> Image.Image:
     return image
 
 
+def _depth_rgb(depth: np.ndarray) -> Image.Image:
+    """16-bit depth packed losslessly into an 8-bit PNG (R = high byte, G = low byte) — canvas reads only 8 bits."""
+    rgb = np.zeros((*depth.shape, 3), dtype=np.uint8)
+    rgb[..., 0], rgb[..., 1] = depth >> 8, depth & 0xFF
+    return Image.fromarray(rgb, "RGB")
+
+
+def _lines(wall: Wall) -> list[dict]:
+    return [
+        {"color": line.color, "points": [[p.x, p.y, p.kind, p.visible] for p in line.points]}
+        for line in wall.lines
+    ]
+
+
 def write_gallery(walls: list[Wall], media_root: Path, out_dir: Path) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     sections = []
@@ -64,7 +80,8 @@ def write_gallery(walls: list[Wall], media_root: Path, out_dir: Path) -> Path:
         _small(render_wall_preview(wall, media_root)).save(out_dir / f"{wall.id}-linie.jpg", quality=85)
         colorize(depth).save(out_dir / f"{wall.id}-glebia.jpg", quality=85)
         hillshade(depth).save(out_dir / f"{wall.id}-cien.jpg", quality=85)
-        Image.fromarray((depth >> 8).astype(np.uint8), "L").save(out_dir / f"{wall.id}-szara.png")
+        _depth_rgb(depth).save(out_dir / f"{wall.id}-glebia16.png")
+        (out_dir / f"{wall.id}-linie.json").write_text(json.dumps(_lines(wall)), encoding="utf-8")
         with Image.open(Path(media_root) / wall.image_path) as photo:
             photo.convert("RGB").save(out_dir / f"{wall.id}-zdjecie.jpg", quality=88)
         title = html.escape(f"{wall.crag.name} — {wall.name or 'ściana'}")
@@ -81,7 +98,7 @@ def write_gallery(walls: list[Wall], media_root: Path, out_dir: Path) -> Path:
     index.write_text(
         _INDEX.replace("{count}", str(len(walls))).replace("{sections}", "\n".join(sections)), encoding="utf-8"
     )
-    (out_dir / "view.html").write_text(_VIEW, encoding="utf-8")
+    shutil.copyfile(Path(__file__).with_name("depth_preview_view.html"), out_dir / "view.html")
     return index
 
 
@@ -99,70 +116,4 @@ a{color:#2f4fa0}
 Podgląd 2.5D wymaga serwera: <code>npx --yes serve cache/glebia</code>.</p>
 {sections}
 </body></html>
-"""
-
-_VIEW = """<!doctype html>
-<html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Podgląd 2.5D</title>
-<style>html,body{margin:0;height:100%;overflow:hidden;background:#1d1916;color:#ede3d2;font:14px system-ui,sans-serif}
-#ui{position:fixed;top:8px;left:8px;background:#0009;padding:8px 10px;border-radius:8px}a{color:#8ccbe6}</style>
-</head><body>
-<div id="ui"><a href="index.html">← galeria</a> · głębia <input id="scale" type="range" min="0" max="0.6" step="0.01" value="0.25">
-· <label><input id="wire" type="checkbox"> siatka</label></div>
-<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.170.0/build/three.module.js",
-"three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/"}}</script>
-<script type="module">
-import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-
-const params = new URLSearchParams(location.hash.slice(1));  // hash survives the clean-URL redirect of `serve`
-const id = params.get("id");
-const aspect = Number(params.get("w")) / Number(params.get("h"));
-const width = aspect >= 1 ? 1.6 : 1.6 * aspect;
-const height = width / aspect;
-
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(devicePixelRatio);
-renderer.setSize(innerWidth, innerHeight);
-document.body.appendChild(renderer.domElement);
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.01, 100);
-camera.position.set(0, 0, 2.6);
-
-const loader = new THREE.TextureLoader();
-const photo = loader.load(`${id}-zdjecie.jpg`);
-photo.colorSpace = THREE.SRGBColorSpace;
-const depth = loader.load(`${id}-szara.png`);
-const material = new THREE.MeshStandardMaterial({
-  color: 0x000000, emissive: 0xffffff, emissiveMap: photo, displacementMap: depth,
-});
-const segmentsX = aspect >= 1 ? 384 : Math.round(384 * aspect);
-const segmentsY = aspect >= 1 ? Math.round(384 / aspect) : 384;
-scene.add(new THREE.Mesh(new THREE.PlaneGeometry(width, height, segmentsX, segmentsY), material));
-
-const scaleInput = document.getElementById("scale");
-function applyScale() {
-  material.displacementScale = Number(scaleInput.value) * width;
-  material.displacementBias = -material.displacementScale / 2;
-}
-scaleInput.addEventListener("input", applyScale);
-applyScale();
-document.getElementById("wire").addEventListener("change", (e) => { material.wireframe = e.target.checked; });
-
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.minAzimuthAngle = -Math.PI / 6;
-controls.maxAzimuthAngle = Math.PI / 6;
-controls.minPolarAngle = Math.PI / 2 - Math.PI / 9;
-controls.maxPolarAngle = Math.PI / 2 + Math.PI / 9;
-controls.minDistance = 0.8;
-controls.maxDistance = 5;
-
-addEventListener("resize", () => {
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-});
-renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
-</script></body></html>
 """

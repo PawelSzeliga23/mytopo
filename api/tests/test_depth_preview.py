@@ -1,8 +1,10 @@
+import json
+
 import numpy as np
 from PIL import Image
 
 from tests import factories as f
-from topo.depth import save_depth_png
+from topo.depth import load_depth, save_depth_png
 from topo.depth_preview import colorize, hillshade, ready_walls, write_gallery
 
 
@@ -47,11 +49,18 @@ def test_write_gallery_creates_files_and_escaped_index(session, tmp_path):
     wall = _ready_wall(session, tmp_path / "media")
     index = write_gallery([wall], tmp_path / "media", tmp_path / "out")
     out = tmp_path / "out"
-    for suffix in ("linie.jpg", "glebia.jpg", "cien.jpg", "zdjecie.jpg", "szara.png"):
+    for suffix in ("linie.jpg", "glebia.jpg", "cien.jpg", "zdjecie.jpg", "glebia16.png", "linie.json"):
         assert (out / f"{wall.id}-{suffix}").exists(), suffix
     assert (out / "view.html").exists()
     html = index.read_text(encoding="utf-8")
     assert "Skała &lt;Test&gt;" in html
     assert f"view.html#id={wall.id}&amp;w=160&amp;h=120" in html
-    with Image.open(out / f"{wall.id}-szara.png") as gray:
-        assert gray.mode == "L" and gray.size == (160, 120)
+    with Image.open(out / f"{wall.id}-glebia16.png") as packed:
+        rgb = np.asarray(packed).astype(np.uint16)
+    assert rgb.shape == (120, 160, 3)
+    np.testing.assert_array_equal(rgb[..., 0] * 256 + rgb[..., 1], load_depth(tmp_path / "media" / wall.depth_path))
+    lines = json.loads((out / f"{wall.id}-linie.json").read_text(encoding="utf-8"))
+    assert lines == [{
+        "color": wall.lines[0].color,
+        "points": [[0.5, 0.9, "start", False], [0.5, 0.5, "ring", True], [0.5, 0.1, "stanowisko", True]],
+    }]

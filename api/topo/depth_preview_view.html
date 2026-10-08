@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Podgląd 2.5D</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#05080b;color:#cfeffa;font:14px system-ui,sans-serif}
+#ui{position:fixed;top:8px;left:8px;background:#000a;padding:8px 10px;border-radius:8px;line-height:2}
+#ui label{margin-right:10px;white-space:nowrap}a{color:#8ccbe6}input[type=range]{vertical-align:middle;width:120px}</style>
+</head><body>
+<div id="ui"><a href="index.html">← galeria</a><br>
+<label><input type="radio" name="mode" value="holo" checked> hologram</label>
+<label><input type="radio" name="mode" value="photo"> zdjęcie</label><br>
+<label>głębia <input id="scale" type="range" min="0" max="0.6" step="0.01" value="0.25"></label><br>
+<label>wycinanie skoków <input id="cut" type="range" min="0.005" max="0.3" step="0.005" value="0.04"></label>
+<span id="cutValue"></span><br>
+<label><input id="contours" type="checkbox" checked> poziomice</label>
+<label><input id="routes" type="checkbox" checked> drogi</label>
+<label><input id="wire" type="checkbox"> siatka</label></div>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.170.0/build/three.module.js",
+"three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { Line2 } from "three/addons/lines/Line2.js";
+import { LineGeometry } from "three/addons/lines/LineGeometry.js";
+import { LineMaterial } from "three/addons/lines/LineMaterial.js";
+
+const params = new URLSearchParams(location.hash.slice(1));  // hash survives the clean-URL redirect of `serve`
+const id = params.get("id");
+const $ = (selector) => document.querySelector(selector);
+
+// 16-bit depth packed into R (high byte) and G (low byte); read without colour conversion.
+const depthBlob = await (await fetch(`${id}-glebia16.png`)).blob();
+const bitmap = await createImageBitmap(depthBlob, { colorSpaceConversion: "none", premultiplyAlpha: "none" });
+const W = bitmap.width, H = bitmap.height;
+const ctx = new OffscreenCanvas(W, H).getContext("2d", { willReadFrequently: true });
+ctx.drawImage(bitmap, 0, 0);
+const rgba = ctx.getImageData(0, 0, W, H).data;
+const depth = new Float32Array(W * H);
+for (let i = 0; i < W * H; i++) depth[i] = (rgba[4 * i] * 256 + rgba[4 * i + 1]) / 65535;
+const lines = await (await fetch(`${id}-linie.json`)).json();
+
+const aspect = W / H;
+const width = aspect >= 1 ? 1.6 : 1.6 * aspect;
+const height = width / aspect;
+const GX = aspect >= 1 ? 384 : Math.round(384 * aspect);
+const GY = aspect >= 1 ? Math.round(384 / aspect) : 384;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x05080b);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.01, 100);
+camera.position.set(0, 0, 2.6);
+
+// Mesh: one vertex per grid node, depth from the nearest depth-map pixel.
+const count = (GX + 1) * (GY + 1);
+const positions = new Float32Array(count * 3);
+const uvs = new Float32Array(count * 2);
+const nodeDepth = new Float32Array(count);
+for (let j = 0; j <= GY; j++) {
+  for (let i = 0; i <= GX; i++) {
+    const k = j * (GX + 1) + i, u = i / GX, v = j / GY;
+    nodeDepth[k] = depth[Math.round(v * (H - 1)) * W + Math.round(u * (W - 1))];
+    positions[3 * k] = (u - 0.5) * width;
+    positions[3 * k + 1] = (0.5 - v) * height;
+    uvs[2 * k] = u;
+    uvs[2 * k + 1] = 1 - v;
+  }
+}
+const geometry = new THREE.BufferGeometry();
+geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+geometry.setAttribute("depth", new THREE.BufferAttribute(nodeDepth, 1));
+
+// Triangles whose corners differ in depth by more than `cut` (fraction of the depth range) are not drawn.
+function buildIndex(cut) {
+  const index = [];
+  const keep = (a, b, c) =>
+    Math.max(nodeDepth[a], nodeDepth[b], nodeDepth[c]) - Math.min(nodeDepth[a], nodeDepth[b], nodeDepth[c]) <= cut;
+  for (let j = 0; j < GY; j++) {
+    for (let i = 0; i < GX; i++) {
+      const a = j * (GX + 1) + i, b = a + 1, c = a + GX + 1, d = c + 1;
+      if (keep(a, c, b)) index.push(a, c, b);
+      if (keep(b, c, d)) index.push(b, c, d);
+    }
+  }
+  geometry.setIndex(index);
+}
+
+const photo = new THREE.TextureLoader().load(`${id}-zdjecie.jpg`);
+photo.colorSpace = THREE.SRGBColorSpace;
+const photoMaterial = new THREE.MeshBasicMaterial({ map: photo, side: THREE.DoubleSide });
+const holoMaterial = new THREE.ShaderMaterial({
+  side: THREE.DoubleSide,
+  uniforms: { contours: { value: 1 }, levels: { value: 40 } },
+  vertexShader: `
+    attribute float depth;
+    varying vec3 vNormal; varying vec3 vView; varying float vDepth;
+    void main() {
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      vNormal = normalize(normalMatrix * normal); vView = -mv.xyz; vDepth = depth;
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: `
+    uniform float contours; uniform float levels;
+    varying vec3 vNormal; varying vec3 vView; varying float vDepth;
+    void main() {
+      vec3 n = normalize(vNormal);
+      if (!gl_FrontFacing) n = -n;
+      float light = clamp(dot(n, normalize(vec3(-0.45, 0.55, 0.7))), 0.0, 1.0);
+      float rim = pow(1.0 - abs(dot(n, normalize(vView))), 2.0);
+      float d = vDepth * levels;
+      float line = (1.0 - min(abs(fract(d - 0.5) - 0.5) / fwidth(d), 1.0)) * contours;
+      vec3 color = mix(vec3(0.01, 0.07, 0.10), vec3(0.15, 0.75, 0.95), light)
+        + line * vec3(0.45, 0.95, 1.0) * 0.7 + rim * vec3(0.1, 0.55, 0.9) * 0.5;
+      gl_FragColor = vec4(color, 1.0);
+    }`,
+});
+const mesh = new THREE.Mesh(geometry, holoMaterial);
+scene.add(mesh);
+
+// Route lines: depth of each sample = median of a 9x9 window, so a branch pixel does not pull the line forward.
+function medianDepth(x, y) {
+  const cx = Math.round(x * (W - 1)), cy = Math.round(y * (H - 1)), values = [];
+  for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+    const px = Math.min(W - 1, Math.max(0, cx + dx)), py = Math.min(H - 1, Math.max(0, cy + dy));
+    values.push(depth[py * W + px]);
+  }
+  values.sort((p, q) => p - q);
+  return values[values.length >> 1];
+}
+const routes = new THREE.Group();
+scene.add(routes);
+const lineMaterials = [];
+function buildRoutes(scale) {
+  routes.clear();
+  lineMaterials.length = 0;
+  for (const route of lines) {
+    const flat = [];
+    const last = route.points.length - 2;
+    for (let s = 0; s <= last; s++) {
+      const [x0, y0] = route.points[s], [x1, y1] = route.points[s + 1];
+      const steps = Math.max(1, Math.round(Math.hypot((x1 - x0) * W, (y1 - y0) * H) / 6));
+      for (let t = 0; t < steps + (s === last ? 1 : 0); t++) {
+        const x = x0 + ((x1 - x0) * t) / steps, y = y0 + ((y1 - y0) * t) / steps;
+        flat.push((x - 0.5) * width, (0.5 - y) * height, (medianDepth(x, y) - 0.5) * scale + 0.004 * width);
+      }
+    }
+    if (flat.length < 6) continue;
+    const lineGeometry = new LineGeometry();
+    lineGeometry.setPositions(flat);
+    const material = new LineMaterial({ color: route.color, linewidth: 3 });
+    material.resolution.set(innerWidth, innerHeight);
+    lineMaterials.push(material);
+    routes.add(new Line2(lineGeometry, material));
+    for (const [x, y, , visible] of route.points) {
+      if (!visible) continue;
+      const bolt = new THREE.Mesh(new THREE.SphereGeometry(0.006 * width), new THREE.MeshBasicMaterial({ color: 0xffe066 }));
+      bolt.position.set((x - 0.5) * width, (0.5 - y) * height, (medianDepth(x, y) - 0.5) * scale + 0.006 * width);
+      routes.add(bolt);
+    }
+  }
+}
+
+function applyScale() {
+  const scale = Number($("#scale").value) * width;
+  for (let k = 0; k < count; k++) positions[3 * k + 2] = (nodeDepth[k] - 0.5) * scale;
+  geometry.attributes.position.needsUpdate = true;
+  geometry.computeVertexNormals();
+  buildRoutes(scale);
+}
+function applyCut() {
+  const cut = Number($("#cut").value);
+  $("#cutValue").textContent = cut >= 0.3 ? "(wyłączone)" : `(${(cut * 100).toFixed(1)}% zakresu)`;
+  buildIndex(cut >= 0.3 ? Infinity : cut);
+  geometry.computeVertexNormals();
+}
+function applyMode() {
+  mesh.material = $("input[name=mode]:checked").value === "holo" ? holoMaterial : photoMaterial;
+  mesh.material.wireframe = $("#wire").checked;
+}
+$("#scale").addEventListener("input", applyScale);
+$("#cut").addEventListener("input", applyCut);
+for (const radio of document.querySelectorAll("input[name=mode]")) radio.addEventListener("change", applyMode);
+$("#wire").addEventListener("change", applyMode);
+$("#contours").addEventListener("change", (e) => { holoMaterial.uniforms.contours.value = e.target.checked ? 1 : 0; });
+$("#routes").addEventListener("change", (e) => { routes.visible = e.target.checked; });
+applyCut();
+applyScale();
+applyMode();
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.minAzimuthAngle = -Math.PI / 6;
+controls.maxAzimuthAngle = Math.PI / 6;
+controls.minPolarAngle = Math.PI / 2 - Math.PI / 9;
+controls.maxPolarAngle = Math.PI / 2 + Math.PI / 9;
+controls.minDistance = 0.8;
+controls.maxDistance = 5;
+
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  for (const material of lineMaterials) material.resolution.set(innerWidth, innerHeight);
+});
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+</script></body></html>
