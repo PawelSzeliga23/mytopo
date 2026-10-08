@@ -34,6 +34,28 @@ docker compose run --rm api topo draw-wall 1 /data/cache/podglad-1.png          
 
 Surowe odpowiedzi trafiają do `./cache/`, zdjęcia do `./media/`. Ponowne uruchomienie korzysta z cache i nie nadpisuje ręcznych poprawek.
 
+## Mapy głębi
+
+Liczone modelem Depth Anything V2 w osobnej usłudze z GPU (obraz z PyTorch, ok. 6–8 GB):
+
+```powershell
+docker compose --profile depth build depth
+docker compose run --rm depth topo depth --crags 100        # próbnie: ściany pierwszych 100 skał
+docker compose run --rm depth topo depth --all              # wszystkie bez gotowej głębi (Large, GPU)
+docker compose run --rm depth topo depth --only-model small # przelicz ściany zrobione modelem Small
+docker compose run --rm depth topo depth --wall 12 --force  # jedna ściana od nowa
+docker compose run --rm depth pytest -m slow                # test prawdziwego modelu (Small, CPU)
+```
+
+Wynik: `media/walls/{id}/depth.png` (PNG 16-bit, dłuższy bok 768 px, jasne = bliżej). Modele pobierają się do `./cache/huggingface/`.
+
+Galeria do oceny wyników (zdjęcie z liniami, głębia, cieniowanie, podgląd 2.5D):
+
+```powershell
+docker compose run --rm depth topo depth-preview /data/cache/glebia --crags 100
+npx --yes serve cache/glebia     # potem http://localhost:3000
+```
+
 ## Front
 
 ```powershell

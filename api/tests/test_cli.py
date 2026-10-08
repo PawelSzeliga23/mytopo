@@ -1,8 +1,12 @@
+from contextlib import nullcontext
+
+import numpy as np
 from PIL import Image
 from typer.testing import CliRunner
 
 from tests import factories as f
 from topo.cli import app
+from topo.config import Settings
 from topo.importer.preview import render_wall_preview
 
 
@@ -50,3 +54,83 @@ def test_import_writes_report_file_on_interrupt(tmp_path, monkeypatch):
     result = CliRunner().invoke(app, ["import", "portalgorski", "--offline", "--report", str(path)])
     assert result.exit_code == 130
     assert "Skały: 1 nowych" in path.read_text(encoding="utf-8")
+
+
+class FakeDepthEstimator:
+    name = "depth-anything-v2-large"
+    device = "cpu"
+
+    def __init__(self, model="large", device=None):
+        pass
+
+    def predict(self, image):
+        return np.asarray(image, dtype=np.float32)[:, :, 0]
+
+
+def _depth_setup(session, tmp_path, monkeypatch, crags=("Pierwsza", "Druga")):
+    monkeypatch.setattr("topo.cli.SessionLocal", lambda: nullcontext(session))
+    monkeypatch.setattr("topo.cli.get_settings", lambda: Settings(media_root=str(tmp_path), cache_dir=str(tmp_path)))
+    monkeypatch.setattr("topo.cli.HFDepthEstimator", FakeDepthEstimator)
+    region = f.area(session, "R")
+    walls = []
+    for name in crags:
+        wall = f.wall(session, f.crag(session, region, name))
+        (tmp_path / "walls" / str(wall.id)).mkdir(parents=True)
+        Image.new("RGB", (40, 30), (wall.id * 20 % 255, 0, 0)).save(tmp_path / "walls" / str(wall.id) / "display.webp")
+        wall.image_path = f"walls/{wall.id}/display.webp"
+        walls.append(wall)
+    session.flush()
+    return walls
+
+
+def test_depth_command_requires_selection():
+    result = CliRunner().invoke(app, ["depth"])
+    assert result.exit_code != 0
+    assert "--all" in result.output
+
+
+def test_depth_command_rejects_unknown_model():
+    result = CliRunner().invoke(app, ["depth", "--all", "--model", "huge"])
+    assert result.exit_code != 0
+    assert "large" in result.output
+
+
+def test_depth_command_crags_limit(session, tmp_path, monkeypatch):
+    walls = _depth_setup(session, tmp_path, monkeypatch)
+    result = CliRunner().invoke(app, ["depth", "--crags", "1"])
+    assert result.exit_code == 0, result.output
+    assert "Gotowe: 1" in result.output
+    assert [w.depth_status for w in walls] == ["ready", "pending"]
+
+
+def test_depth_command_nothing_to_do(session, tmp_path, monkeypatch):
+    walls = _depth_setup(session, tmp_path, monkeypatch)
+    for wall in walls:
+        wall.depth_status = "ready"
+    session.flush()
+    result = CliRunner().invoke(app, ["depth", "--all"])
+    assert result.exit_code == 0
+    assert "Nic do przeliczenia" in result.output
+
+
+def test_depth_command_interrupt(session, tmp_path, monkeypatch):
+    walls = _depth_setup(session, tmp_path, monkeypatch)
+    calls = []
+
+    class Interrupting(FakeDepthEstimator):
+        def predict(self, image):
+            calls.append(1)
+            if len(calls) == 2:
+                raise KeyboardInterrupt
+            return super().predict(image)
+
+    monkeypatch.setattr("topo.cli.HFDepthEstimator", Interrupting)
+    result = CliRunner().invoke(app, ["depth", "--all"])
+    assert result.exit_code == 130
+    assert "Przerwano" in result.output
+    assert walls[0].depth_status == "ready"
+
+
+def test_cli_help_lists_depth_commands():
+    result = CliRunner().invoke(app, ["--help"])
+    assert "depth" in result.output and "depth-preview" in result.output
