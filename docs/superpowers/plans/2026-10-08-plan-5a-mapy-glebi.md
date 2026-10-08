@@ -1119,7 +1119,12 @@ Na tej podstawie powstaje plan 5b (widok 2.5D w aplikacji: odporny odczyt głęb
 
 ## Wnioski z wykonania
 
-(uzupełnić po Task 5)
+- **Próba (Task 5):** 251 ścian, model Large na RTX 3060, 0 błędów, średnio 0,5 s na ścianę (głębia) + 0,2 s (segmentacja). Rzeźba skały wiarygodna; gałęzie i krawędzie z niebem dają rozciągnięte „kolce”.
+- **Decyzje użytkownika po próbie:** wycinanie skoków głębi działa „średnio” → zamiast tego segmentacja (skała, podłoże, roślinność, niebo); ściany z roślinnością zasłaniającą > 10% skały dostają tylko 2D (ręcznie `topo wall-3d`, w planie 7 w edytorze); w 2.5D niebo i tło usunięte; tryb „hologram” (skała jasnoniebieska, podłoże szare, przygaszony) obok zdjęcia; kolory skały i podłoża do wyboru, także nałożone na zdjęcie.
+- **Ręczne poprawki** (w podglądzie, bez zapisu): pędzle spłaszcz / gumka / przywróć / maluj podłoże / maluj skałę, wygładzanie, przycinanie krawędzi. Trwały zapis poprawek i kolorów → edytor (plan 7).
+- Na 26 z 251 ścian werdykt „tylko 2D”. Przypadki graniczne (np. Ostatnia IV — krzaki przy krawędzi skały, fragment skały uznany za roślinność) do ręcznej korekty.
+- Pułapki: w Git Bash argumenty `/data/...` wymagają `MSYS_NO_PATHCONV=1`; `serve` przekierowuje `view.html` → `/view` i gubi `?query` (parametry w `#`); SegFormer w transformers 5 wymaga `torchvision`.
+- Następny krok: plan 5b — widok 2.5D na stronie skały.
 
 ## Zmiana po próbie (decyzja użytkownika, 2026-10-08)
 
