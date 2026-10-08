@@ -1,6 +1,7 @@
 from logging.config import fileConfig
 
 from alembic import context
+from geoalchemy2 import alembic_helpers
 from sqlalchemy import Engine, create_engine, text
 
 from topo.config import get_settings
@@ -48,6 +49,8 @@ def run_migrations_online() -> None:
             include_object=include_object,
             compare_type=True,
             compare_server_default=True,
+            process_revision_directives=alembic_helpers.writer,
+            render_item=alembic_helpers.render_item,
         )
         with context.begin_transaction():
             context.run_migrations()

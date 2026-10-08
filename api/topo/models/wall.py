@@ -11,6 +11,8 @@ if TYPE_CHECKING:
 
 
 class Wall(SourceMixin, Base):
+    __versioned__ = {}
+
     __tablename__ = "wall"
     __table_args__ = (
         source_constraint("wall"),

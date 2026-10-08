@@ -14,6 +14,8 @@ if TYPE_CHECKING:
 
 
 class Crag(SourceMixin, Base):
+    __versioned__ = {}
+
     __tablename__ = "crag"
     __table_args__ = (
         source_constraint("crag"),

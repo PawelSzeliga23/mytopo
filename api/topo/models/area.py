@@ -10,6 +10,8 @@ if TYPE_CHECKING:
 
 
 class Area(SourceMixin, Base):
+    __versioned__ = {}
+
     __tablename__ = "area"
     __table_args__ = (
         source_constraint("area"),

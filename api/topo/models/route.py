@@ -11,6 +11,8 @@ if TYPE_CHECKING:
 
 
 class Route(SourceMixin, Base):
+    __versioned__ = {}
+
     __tablename__ = "route"
     __table_args__ = (source_constraint("route"),)
 
@@ -30,6 +32,8 @@ class Route(SourceMixin, Base):
 
 
 class RouteLine(SourceMixin, Base):
+    __versioned__ = {}
+
     __tablename__ = "route_line"
     __table_args__ = (
         source_constraint("route_line"),
@@ -79,6 +83,8 @@ class RouteLine(SourceMixin, Base):
 
 
 class LinePoint(SourceMixin, Base):
+    __versioned__ = {}
+
     __tablename__ = "line_point"
     __table_args__ = (
         source_constraint("line_point"),

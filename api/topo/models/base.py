@@ -1,6 +1,10 @@
 from sqlalchemy import String, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
+from topo.history import enable_versioning
+
+enable_versioning()
+
 
 class Base(DeclarativeBase):
     pass
