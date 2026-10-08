@@ -68,13 +68,14 @@ export function regionLayers(c: MapColors): LayerProps[] {
 export function sectorLayers(c: MapColors): LayerProps[] {
   const { sectorsFrom: from, sectorsUntil: until } = ZOOM;
   const visible = e(["interpolate", ["linear"], ["zoom"], from, 0, from + 0.5, 1, until - 0.5, 1, until, 0]);
+  const opacityWithFade = e(["interpolate", ["linear"], ["zoom"], from, 0, from + 0.5, 0.35, until - 0.5, 0.35, until, 0]);
   return [
     {
       id: "sector-fill",
       type: "fill",
       minzoom: from,
       maxzoom: until,
-      paint: { "fill-color": c.surface, "fill-opacity": e(["*", 0.35, visible]) },
+      paint: { "fill-color": c.surface, "fill-opacity": opacityWithFade },
     },
     {
       id: "sector-outline",
