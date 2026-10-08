@@ -5,7 +5,7 @@ import { aggregateBands } from "@/lib/aggregate";
 import type { AreaProps, CragProps } from "@/lib/api";
 import { useTheme } from "@/lib/theme";
 import { DetailCard } from "@/map/DetailCard";
-import { cragLayers, INTERACTIVE_LAYERS, MAP_COLORS, regionLayers, sectorLayers } from "@/map/layers";
+import { cragLayers, INTERACTIVE_LAYERS, isClickableAt, MAP_COLORS, regionLayers, sectorLayers } from "@/map/layers";
 import { LayerSwitcher } from "@/map/LayerSwitcher";
 import type { Selection } from "@/map/selection";
 import { BASE_LAYERS, buildBaseStyle, type BaseLayer } from "@/map/style";
@@ -58,7 +58,8 @@ export default function MapPage() {
 
   // Feature properties coming back from MapLibre lose nested arrays (bbox, bands), so look the originals up by id.
   function handleClick(event: MapLayerMouseEvent) {
-    const feature = event.features?.[0];
+    const zoom = event.target.getZoom();
+    const feature = event.features?.find((candidate) => isClickableAt(candidate.layer.id, zoom));
     if (!feature) {
       setSelection(null);
       return;

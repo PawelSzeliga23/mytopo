@@ -137,3 +137,23 @@ export function cragLayers(c: MapColors): LayerProps[] {
     ] satisfies LayerProps[];
   });
 }
+
+const FADE_HALF = 0.25;
+// [fade-in start, fade-out end] per interactive layer; null = no fade on that side.
+const CLICKABLE_RANGE: Record<string, [number | null, number | null]> = {
+  "region-points": [null, ZOOM.regionsUntil],
+  "sector-fill": [ZOOM.sectorsFrom, ZOOM.sectorsUntil],
+  "crags-isolated": [null, null],
+  "crags-loose": [ZOOM.looseCragsFrom, null],
+  "crags-sector": [ZOOM.sectorCragsFrom, null],
+};
+
+/** A layer is clickable only once its opacity ramp is at least halfway, so near-invisible objects can't be hit. */
+export function isClickableAt(layerId: string, zoom: number): boolean {
+  const range = CLICKABLE_RANGE[layerId];
+  if (!range) return false;
+  const [fadeInStart, fadeOutEnd] = range;
+  if (fadeInStart !== null && zoom < fadeInStart + FADE_HALF) return false;
+  if (fadeOutEnd !== null && zoom > fadeOutEnd - FADE_HALF) return false;
+  return true;
+}

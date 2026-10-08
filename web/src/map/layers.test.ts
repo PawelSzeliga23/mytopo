@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildBaseStyle } from "@/map/style";
-import { cragLayers, INTERACTIVE_LAYERS, MAP_COLORS, regionLayers, sectorLayers, ZOOM } from "@/map/layers";
+import { cragLayers, INTERACTIVE_LAYERS, isClickableAt, MAP_COLORS, regionLayers, sectorLayers, ZOOM } from "@/map/layers";
 import { validateStyleMin } from "@maplibre/maplibre-gl-style-spec";
 
 const colors = MAP_COLORS.light;
@@ -66,5 +66,30 @@ describe("warstwy mapy", () => {
     // Validate the complete style
     const errors = validateStyleMin(style);
     expect(errors).toEqual([]);
+  });
+});
+
+describe("isClickableAt", () => {
+  it("region-points: nieklikalne w końcówce zaniku", () => {
+    expect(isClickableAt("region-points", 0)).toBe(true);
+    expect(isClickableAt("region-points", ZOOM.regionsUntil - 0.3)).toBe(true);
+    expect(isClickableAt("region-points", ZOOM.regionsUntil - 0.2)).toBe(false);
+  });
+  it("sector-fill: oba brzegi", () => {
+    expect(isClickableAt("sector-fill", ZOOM.sectorsFrom + 0.2)).toBe(false);
+    expect(isClickableAt("sector-fill", ZOOM.sectorsFrom + 0.3)).toBe(true);
+    expect(isClickableAt("sector-fill", ZOOM.sectorsUntil - 0.3)).toBe(true);
+    expect(isClickableAt("sector-fill", ZOOM.sectorsUntil - 0.2)).toBe(false);
+  });
+  it("crags-loose i crags-sector: dopiero po połowie pojawiania się", () => {
+    expect(isClickableAt("crags-loose", ZOOM.looseCragsFrom + 0.2)).toBe(false);
+    expect(isClickableAt("crags-loose", ZOOM.looseCragsFrom + 0.3)).toBe(true);
+    expect(isClickableAt("crags-sector", ZOOM.sectorCragsFrom + 0.2)).toBe(false);
+    expect(isClickableAt("crags-sector", 20)).toBe(true);
+  });
+  it("crags-isolated: zawsze klikalne; nieznana warstwa nie", () => {
+    expect(isClickableAt("crags-isolated", 0)).toBe(true);
+    expect(isClickableAt("crags-isolated", 22)).toBe(true);
+    expect(isClickableAt("nope", 10)).toBe(false);
   });
 });
