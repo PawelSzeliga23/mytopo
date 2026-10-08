@@ -2240,3 +2240,16 @@ git commit -m "feat: API szczegółów obszaru i skały" -m "Co-Authored-By: Cla
 - API odczytu zwraca dane w kształcie, którego potrzebuje importer (plan 2) i front (plany 3–4).
 - Odchylenie od specu: testy używają bazy `topo_test` w kontenerze `db` z compose zamiast testcontainers (backend działa w kontenerze, więc testcontainers wymagałby montowania gniazda Dockera; efekt jest ten sam — prawdziwy PostGIS).
 - Następny krok: plan 2 (importer Portalu Górskiego), pisany po zakończeniu planu 1.
+
+## Wnioski z wykonania (do uwzględnienia w kolejnych planach)
+
+Zmiany w stosunku do kodu z tego planu, wprowadzone po końcowym przeglądzie (commit `ed86853`):
+- `area_geom` używa `UNION` (odporne na cykle), `area` ma `CHECK (parent_id IS NULL OR parent_id <> id)`.
+- Wariant linii: złożony FK `(parent_line_id, parent_point_id) → line_point(line_id, id)` z `ON DELETE SET NULL`, `CHECK` że obie kolumny są razem NULL albo razem ustawione, relacje ORM `RouteLine.parent_line` / `parent_point`. FK `parent_line_id → route_line.id` jest `NO ACTION DEFERRABLE INITIALLY DEFERRED`.
+- Kolejność relacji z `id` jako drugim kluczem; obsługa nieprzechwyconych wyjątków (500) i polskie komunikaty dla innych błędów HTTP; strażnik `*_test` w `conftest.py`; `normalize_grade` usuwa wszystkie białe znaki (w tym NBSP); `compare_type`/`compare_server_default` w Alembic, a `env.py` pomija tabele należące do rozszerzeń PostGIS.
+
+Do zdecydowania w kolejnych planach:
+- **Plan 2:** historia zmian (SQLAlchemy-Continuum) powinna istnieć *przed* importem albo plan 6 musi dopisać wersje bazowe — inaczej pierwszej ręcznej zmiany po imporcie nie da się cofnąć do danych z importu. Ustalić politykę odświeżania `area_geom` (po imporcie i po każdej edycji; najlepiej `REFRESH ... CONCURRENTLY`). Upsert nie może zmieniać slugów istniejących rekordów. Rozstrzygnąć skały bez współrzędnych (`crag.location` jest NOT NULL). Uzupełnić `_FRENCH` o brakujące wyceny po zobaczeniu prawdziwych danych. Skonfigurować `geoalchemy2.alembic_helpers` przed pierwszą autogenerowaną migracją.
+- **Plan 6/7:** co dzieje się z linią po usunięciu drogi (dziś `route_id` → NULL, czyli linia wygląda jak wariant); strategia ID w edytorze przy zapisie całej ściany (tymczasowe ID klienta zamiast kasowania i tworzenia od nowa); ewentualne `UNIQUE (line_id, sort_order)` jako `DEFERRABLE`; blokada wariantu odchodzącego od własnej linii; test kaskadowego usuwania ściany/skały z wariantem na innej ścianie.
+- **Plan 9:** `api/.dockerignore`, obraz produkcyjny bez zależności dev, migracje przy starcie, użytkownik inny niż root.
+- Drobne: dopasowanie tabel rozszerzeń w `env.py` także po schemacie; `to_french` bez sprawdzenia odwróconych przedziałów; ostrzeżenie Starlette o `httpx`.
