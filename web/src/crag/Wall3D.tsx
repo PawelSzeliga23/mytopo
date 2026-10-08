@@ -1,4 +1,4 @@
-import { Html, Line, OrbitControls } from "@react-three/drei";
+import { Line, OrbitControls } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
@@ -112,19 +112,76 @@ function SurfaceMesh({ surface, relief, material }: { surface: Surface; relief: 
   return <mesh geometry={geometry} material={material} />;
 }
 
-/** Places the camera so the whole model fits, whatever the container's shape. */
+/** Frames what is drawn (rock and ground, not the removed sky), whatever the container's shape. */
 function FitCamera({ surface }: { surface: Surface }) {
-  const { camera, size } = useThree();
+  const { camera, size, controls } = useThree();
+  const bounds = useMemo(() => {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const k of surface.index) {
+      const x = surface.positionsXY[2 * k], y = surface.positionsXY[2 * k + 1];
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+    }
+    return Number.isFinite(minX)
+      ? { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, width: maxX - minX, height: maxY - minY }
+      : { cx: 0, cy: 0, width: surface.width, height: surface.height };
+  }, [surface]);
   useEffect(() => {
     const perspective = camera as THREE.PerspectiveCamera;
     const halfTan = Math.tan(THREE.MathUtils.degToRad(perspective.fov / 2));
     const aspect = size.width / Math.max(1, size.height);
-    const distance = 1.08 * Math.max(surface.height / (2 * halfTan), surface.width / (2 * halfTan * aspect));
-    perspective.position.set(0, 0, distance);
-    perspective.lookAt(0, 0, 0);
+    const distance = 1.1 * Math.max(bounds.height / (2 * halfTan), bounds.width / (2 * halfTan * aspect));
+    perspective.position.set(bounds.cx, bounds.cy, distance);
     perspective.updateProjectionMatrix();
-  }, [camera, size.width, size.height, surface]);
+    const orbit = controls as unknown as { target: THREE.Vector3; update: () => void } | null;
+    if (orbit) {
+      orbit.target.set(bounds.cx, bounds.cy, 0);
+      orbit.update();
+    } else perspective.lookAt(bounds.cx, bounds.cy, 0);
+  }, [camera, controls, size.width, size.height, bounds]);
   return null;
+}
+
+/** A route number as a sprite drawn on a small canvas: always faces the camera and keeps its size on screen. */
+function RouteNumber({ position, text, fill, textColor, opacity, handlers }: {
+  position: [number, number, number];
+  text: string;
+  fill: string;
+  textColor: string;
+  opacity: number;
+  handlers: object;
+}) {
+  const { size, camera } = useThree();
+  const texture = useMemo(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 64;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.beginPath();
+      ctx.arc(32, 32, 29, 0, Math.PI * 2);
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "#FFFFFF";
+      ctx.stroke();
+      ctx.fillStyle = textColor;
+      ctx.font = "600 30px 'IBM Plex Sans', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, 32, 34);
+    }
+    const result = new THREE.CanvasTexture(canvas);
+    result.colorSpace = THREE.SRGBColorSpace;
+    return result;
+  }, [text, fill, textColor]);
+  useEffect(() => () => texture.dispose(), [texture]);
+  // With sizeAttenuation off, scale is in view units per unit of distance: 22 px on screen whatever the zoom.
+  const fov = (camera as THREE.PerspectiveCamera).fov;
+  const scale = (22 * 2 * Math.tan(THREE.MathUtils.degToRad(fov / 2))) / Math.max(1, size.height);
+  return (
+    <sprite position={position} scale={[scale, scale, 1]} renderOrder={10} {...handlers}>
+      <spriteMaterial map={texture} sizeAttenuation={false} depthTest={false} transparent opacity={opacity} />
+    </sprite>
+  );
 }
 
 function RouteLines({ items, surface, relief, onChoose, onHoverRoute }: {
@@ -166,18 +223,14 @@ function RouteLines({ items, surface, relief, onChoose, onHoverRoute }: {
               </mesh>
             ))}
             {item.label && (
-              <Html position={pointOnSurface({ x: item.label.x / UNIT, y: item.label.y / UNIT }, surface, relief, 0.012)} center zIndexRange={[20, 0]}>
-                <button
-                  type="button"
-                  onClick={() => onChoose(item.routeId)}
-                  onPointerEnter={() => onHoverRoute(item.routeId)}
-                  onPointerLeave={() => onHoverRoute(null)}
-                  className="flex size-[22px] items-center justify-center rounded-full border-[1.5px] border-white text-[11px] font-semibold"
-                  style={{ background: item.label.fill, color: item.label.textColor, opacity: OPACITY[item.emphasis] }}
-                >
-                  {item.label.text}
-                </button>
-              </Html>
+              <RouteNumber
+                position={pointOnSurface({ x: item.label.x / UNIT, y: item.label.y / UNIT }, surface, relief, 0.012)}
+                text={item.label.text}
+                fill={item.label.fill}
+                textColor={item.label.textColor}
+                opacity={OPACITY[item.emphasis]}
+                handlers={handlers}
+              />
             )}
           </group>
         );
