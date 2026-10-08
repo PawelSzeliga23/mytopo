@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Chip } from "@/components/Chip";
 import { GradeBar } from "@/components/GradeBar";
 import { Button } from "@/components/ui/button";
@@ -53,6 +54,9 @@ interface CardProps extends Omit<BodyProps, "selection"> {
 
 export function DetailCard({ selection, onClose, onZoom, onOpenCrag }: CardProps) {
   const isDesktop = useIsDesktop();
+  // Keep the last selection so the phone drawer keeps its content while it animates closed.
+  const [lastSelection, setLastSelection] = useState(selection);
+  if (selection !== null && selection !== lastSelection) setLastSelection(selection);
   if (isDesktop) {
     if (selection === null) return null;
     return (
@@ -69,7 +73,7 @@ export function DetailCard({ selection, onClose, onZoom, onOpenCrag }: CardProps
       <DrawerContent className="px-4 pb-6">
         <DrawerTitle className="sr-only">Szczegóły</DrawerTitle>
         <DrawerDescription className="sr-only">Informacje o wybranym miejscu na mapie</DrawerDescription>
-        {selection && <DetailCardBody selection={selection} onZoom={onZoom} onOpenCrag={onOpenCrag} />}
+        {lastSelection && <DetailCardBody selection={lastSelection} onZoom={onZoom} onOpenCrag={onOpenCrag} />}
       </DrawerContent>
     </Drawer>
   );

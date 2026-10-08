@@ -4,7 +4,16 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { AreaProps, CragProps } from "@/lib/api";
 import { ThemeProvider } from "@/lib/theme";
-import { DetailCardBody } from "@/map/DetailCard";
+import { DetailCard, DetailCardBody } from "@/map/DetailCard";
+
+vi.mock("@/lib/useMediaQuery", () => ({ useIsDesktop: () => false }));
+// vaul unmounts immediately in jsdom (no animations), so render the drawer content unconditionally to check what DetailCard passes to it.
+vi.mock("@/components/ui/drawer", () => ({
+  Drawer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DrawerContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DrawerTitle: ({ children }: { children: ReactNode }) => <h1>{children}</h1>,
+  DrawerDescription: ({ children }: { children: ReactNode }) => <p>{children}</p>,
+}));
 
 const region: AreaProps = {
   id: 1, name: "Dolina Kobylańska", slug: "dolina-kobylanska", kind: "region", parent_id: 34,
@@ -36,5 +45,20 @@ describe("DetailCardBody", () => {
     expect(screen.getByText("1 droga")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Otwórz skałę" }));
     expect(onOpenCrag).toHaveBeenCalledWith("zabi-kon");
+  });
+});
+
+describe("DetailCard (telefon)", () => {
+  it("zachowuje treść karty podczas zamykania szuflady", async () => {
+    
+    const props = { onClose: vi.fn(), onZoom: vi.fn(), onOpenCrag: vi.fn() };
+    const view = wrap(<DetailCard selection={{ type: "crag", crag }} {...props} />);
+    expect(screen.getByRole("heading", { name: "Żabi Koń" })).toBeInTheDocument();
+    view.rerender(
+      <ThemeProvider>
+        <DetailCard selection={null} {...props} />
+      </ThemeProvider>,
+    );
+    expect(screen.getByRole("heading", { name: "Żabi Koń" })).toBeInTheDocument();
   });
 });

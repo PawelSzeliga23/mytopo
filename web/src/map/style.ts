@@ -53,8 +53,8 @@ export function buildBaseStyle(base: BaseLayer, dark: boolean): StyleSpecificati
       id: "hillshade",
       type: "raster",
       source: "hillshade",
-      minzoom: 8,
-      paint: { "raster-opacity": dark ? 0.25 : 0.35 },
+      minzoom: 10,
+      paint: { "raster-opacity": dark ? 0.25 : 0.35, "raster-brightness-max": dark ? 0.4 : 1 },
     });
   }
   return style;

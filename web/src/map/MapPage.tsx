@@ -95,7 +95,9 @@ export default function MapPage() {
         mapStyle={style}
         interactiveLayerIds={INTERACTIVE_LAYERS}
         onClick={handleClick}
-        onMouseEnter={() => setCursor("pointer")}
+        onMouseMove={(event) =>
+          setCursor(event.features?.some((feature) => isClickableAt(feature.layer.id, event.target.getZoom())) ? "pointer" : "")
+        }
         onMouseLeave={() => setCursor("")}
         cursor={cursor}
         style={{ position: "absolute", inset: 0 }}

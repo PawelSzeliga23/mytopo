@@ -25,4 +25,18 @@ describe("buildBaseStyle", () => {
     const light = buildBaseStyle("osm", false).layers.find((layer) => layer.id === "base");
     expect(light).toMatchObject({ paint: { "raster-brightness-max": 1 } });
   });
+
+  it("w ciemnym motywie zmniejsza nasycenie podkładu", () => {
+    const dark = buildBaseStyle("osm", true).layers.find((layer) => layer.id === "base");
+    expect(dark).toMatchObject({ paint: { "raster-saturation": -0.3 } });
+    const light = buildBaseStyle("osm", false).layers.find((layer) => layer.id === "base");
+    expect(light).toMatchObject({ paint: { "raster-saturation": 0 } });
+  });
+
+  it("cieniowanie pojawia się od zoomu 10 i jest przyciemnione w ciemnym motywie", () => {
+    const dark = buildBaseStyle("osm", true).layers.find((layer) => layer.id === "hillshade");
+    expect(dark).toMatchObject({ minzoom: 10, paint: { "raster-opacity": 0.25, "raster-brightness-max": 0.4 } });
+    const light = buildBaseStyle("osm", false).layers.find((layer) => layer.id === "hillshade");
+    expect(light).toMatchObject({ minzoom: 10, paint: { "raster-opacity": 0.35, "raster-brightness-max": 1 } });
+  });
 });
