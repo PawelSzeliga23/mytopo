@@ -1,3 +1,4 @@
+import "@/map/worker";
 import { useMemo, useRef, useState } from "react";
 import Map, { Layer, Source, type MapLayerMouseEvent, type MapRef } from "react-map-gl/maplibre";
 import { useNavigate } from "react-router";
