@@ -16,7 +16,7 @@
 |---|---|---|
 | **1** | **Szkielet, baza, migracje, API odczytu** | ten dokument |
 | 2 | Importer Portalu Górskiego + weryfikacja na prawdziwych danych | po planie 1 |
-| 3 | Front: szkielet React + mapa z trzema poziomami | po planie 2 |
+| 3 | Front: rozmowa o designie + mockupy (spec §6.0), szkielet React, mapa z trzema poziomami | po planie 2 |
 | 4 | Strona skały: widok 2D i lista dróg | |
 | 5 | Mapy głębi (GPU, CLI) i widok 2.5D | |
 | 6 | Hasło, edycja tekstu, historia zmian (SQLAlchemy-Continuum) | |

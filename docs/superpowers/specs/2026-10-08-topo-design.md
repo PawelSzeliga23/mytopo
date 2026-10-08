@@ -126,6 +126,9 @@ Hasło edycji w zmiennej `EDIT_PASSWORD`, klucz podpisu ciasteczka w `SECRET_KEY
 
 ## 6. Frontend
 
+### 6.0 Proces projektowania wyglądu
+Wygląd ma być ładny i nowoczesny. Przed implementacją każdej strony (mapa, strona skały, edytor topo, wyszukiwarka, strony obszarów, ostatnie zmiany) odbywa się osobna rozmowa o designie z autorem (z użyciem skilla `frontend-design`): kierunek wizualny, typografia, kolory, układ na telefonie i na komputerze. Wynikiem są **mockupy do akceptacji przed wdrożeniem**. Pierwsza taka rozmowa ustala wspólny system wizualny (kolory, fonty, komponenty), z którego korzystają kolejne strony.
+
 ### 6.1 Mapa (strona główna)
 - MapLibre GL + react-map-gl, na całą stronę.
 - Trzy warstwy zależne od przybliżenia, z płynnym przenikaniem (interpolacja `*-opacity` po `zoom`):
