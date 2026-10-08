@@ -51,6 +51,8 @@ def test_map_crags_with_grade_bands(client, session):
     assert zabi["properties"]["grade_bands"] == [1, 1, 0, 1]
     assert zabi["properties"]["in_sector"] is True
     assert by_name["Samotna"]["properties"]["in_sector"] is False
+    assert zabi["properties"]["area_kind"] == "sektor"
+    assert by_name["Samotna"]["properties"]["area_kind"] == "region"
 
 
 def test_map_areas_rejects_unknown_kind(client):
