@@ -4,7 +4,8 @@ import typer
 
 from topo.config import get_settings
 from topo.db import SessionLocal
-from topo.importer.fetch import CachedFetcher
+from topo.importer.fetch import CachedFetcher, FetchError
+from topo.importer.portalgorski.store import ImportReport
 from topo.importer.portalgorski.run import format_report, import_portalgorski
 from topo.importer.preview import render_wall_preview
 from topo.models import Wall
@@ -24,9 +25,19 @@ def import_portalgorski_command(
     """Importuje skały, ściany, zdjęcia i drogi z topo.portalgorski.pl."""
     settings = get_settings()
     fetcher = CachedFetcher(Path(settings.cache_dir) / "portalgorski", delay=delay, offline=offline)
-    report = import_portalgorski(
-        SessionLocal, fetcher, Path(settings.media_root), only_area=only_area, limit=limit, log=typer.echo
-    )
+    report = ImportReport()
+    try:
+        import_portalgorski(
+            SessionLocal, fetcher, Path(settings.media_root),
+            only_area=only_area, limit=limit, log=typer.echo, report=report,
+        )
+    except KeyboardInterrupt:
+        typer.echo("Przerwano — zapisane skały zostają, ponowne uruchomienie dokończy z cache.")
+        typer.echo(format_report(report))
+        raise typer.Exit(130)
+    except FetchError as exc:
+        typer.echo(f"Błąd pobierania: {exc}", err=True)
+        raise typer.Exit(1)
     typer.echo(format_report(report))
 
 

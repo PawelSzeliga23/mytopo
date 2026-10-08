@@ -114,3 +114,54 @@ def test_format_report_is_polish(session, tmp_path):
     text = format_report(run(session, tmp_path))
     assert "Skały: 2 nowych" in text
     assert "Pominięte błędne adresy z listy skał (1)" in text
+
+
+class PatchedFetcher(FakeFetcher):
+    def __init__(self, url, replacement=None, exc=None):
+        super().__init__()
+        self.url, self.replacement, self.exc = url, replacement, exc
+
+    def get(self, url):
+        if url == self.url:
+            if self.exc:
+                raise self.exc
+            if self.replacement is not None:
+                return self.replacement
+        return super().get(url)
+
+
+def test_failed_rock_is_rolled_back_in_report(session, tmp_path):
+    html = (FIXTURES / "skala955.html").read_bytes().replace("49.80255900000 , 20.16932900000".encode(), b"")
+    report = run(session, tmp_path, PatchedFetcher(SZCZYRZYC_URL, html))
+
+    assert report.crags_created == 1
+    assert report.routes == 9
+    assert len(report.errors) == 1 and "Szczyrzyc" in report.errors[0]
+    assert count(session, Crag) == 1
+
+
+def test_garbage_rock_page_does_not_stop_import(session, tmp_path):
+    report = run(session, tmp_path, PatchedFetcher(SZCZYRZYC_URL, b"\x00\x01 nie html"))
+
+    assert count(session, Crag) == 1
+    assert any("Szczyrzyc" in error for error in report.errors)
+
+
+def test_interrupt_keeps_stored_rocks_and_refreshes_geom(session, tmp_path):
+    fetcher = PatchedFetcher(SZCZYRZYC_URL, exc=KeyboardInterrupt())
+    try:
+        run(session, tmp_path, fetcher)
+        raise AssertionError("KeyboardInterrupt should propagate")
+    except KeyboardInterrupt:
+        pass
+
+    assert count(session, Crag) == 1
+    region = session.scalar(select(Area).where(Area.source_id == "region:100"))
+    crag_count = session.scalar(text("SELECT crag_count FROM area_geom WHERE area_id = :id"), {"id": region.id})
+    assert crag_count == 1
+
+
+def test_empty_selection_is_logged(session, tmp_path):
+    messages = []
+    import_portalgorski(factory_for(session), FakeFetcher(), tmp_path, only_area="nigdzie", log=messages.append)
+    assert "Brak skał pasujących do filtra" in messages

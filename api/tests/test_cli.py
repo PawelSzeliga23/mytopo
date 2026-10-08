@@ -1,5 +1,3 @@
-import io
-
 from PIL import Image
 from typer.testing import CliRunner
 
