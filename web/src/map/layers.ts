@@ -1,0 +1,138 @@
+import type { ExpressionSpecification } from "maplibre-gl";
+import type { LayerProps } from "react-map-gl/maplibre";
+import type { Theme } from "@/lib/theme";
+
+export const ZOOM = {
+  regionsUntil: 10.5,
+  sectorsFrom: 10,
+  sectorsUntil: 14,
+  looseCragsFrom: 10,
+  sectorCragsFrom: 12.5,
+} as const;
+
+export interface MapColors {
+  brand: string;
+  halo: string;
+  ink: string;
+  surface: string;
+}
+
+export const MAP_COLORS: Record<Theme, MapColors> = {
+  light: { brand: "#C2541B", halo: "#F4ECDD", ink: "#2B2420", surface: "#E6D8BF" },
+  dark: { brand: "#E2763A", halo: "#1D1916", ink: "#EDE3D2", surface: "#2E2722" },
+};
+
+export const INTERACTIVE_LAYERS = ["region-points", "sector-fill", "crags-isolated", "crags-loose", "crags-sector"];
+
+const FONT = ["Noto Sans Bold"];
+const e = (expression: unknown) => expression as ExpressionSpecification;
+const fadeOut = (until: number) => e(["interpolate", ["linear"], ["zoom"], until - 0.5, 1, until, 0]);
+const fadeIn = (from: number) => e(["interpolate", ["linear"], ["zoom"], from, 0, from + 0.5, 1]);
+
+function labelPaint(c: MapColors, opacity: ExpressionSpecification | number = 1) {
+  return { "text-color": c.ink, "text-halo-color": c.halo, "text-halo-width": 1.5, "text-opacity": opacity };
+}
+
+export function regionLayers(c: MapColors): LayerProps[] {
+  const opacity = fadeOut(ZOOM.regionsUntil);
+  return [
+    {
+      id: "region-points",
+      type: "circle",
+      maxzoom: ZOOM.regionsUntil,
+      paint: {
+        "circle-radius": 8,
+        "circle-color": c.brand,
+        "circle-stroke-color": c.halo,
+        "circle-stroke-width": 2,
+        "circle-opacity": opacity,
+        "circle-stroke-opacity": opacity,
+      },
+    },
+    {
+      id: "region-labels",
+      type: "symbol",
+      maxzoom: ZOOM.regionsUntil,
+      layout: {
+        "text-field": e(["concat", ["get", "name"], " · ", ["to-string", ["get", "crag_count"]]]),
+        "text-font": FONT,
+        "text-size": 13,
+        "text-offset": [0, 1.2],
+        "text-anchor": "top",
+      },
+      paint: labelPaint(c, opacity),
+    },
+  ];
+}
+
+export function sectorLayers(c: MapColors): LayerProps[] {
+  const { sectorsFrom: from, sectorsUntil: until } = ZOOM;
+  const visible = e(["interpolate", ["linear"], ["zoom"], from, 0, from + 0.5, 1, until - 0.5, 1, until, 0]);
+  return [
+    {
+      id: "sector-fill",
+      type: "fill",
+      minzoom: from,
+      maxzoom: until,
+      paint: { "fill-color": c.surface, "fill-opacity": e(["*", 0.35, visible]) },
+    },
+    {
+      id: "sector-outline",
+      type: "line",
+      minzoom: from,
+      maxzoom: until,
+      paint: { "line-color": c.brand, "line-width": 1.2, "line-opacity": visible },
+    },
+    {
+      id: "sector-labels",
+      type: "symbol",
+      minzoom: from,
+      maxzoom: until,
+      layout: { "text-field": e(["get", "name"]), "text-font": FONT, "text-size": 12 },
+      paint: labelPaint(c, visible),
+    },
+  ];
+}
+
+export function cragLayers(c: MapColors): LayerProps[] {
+  const groups: { id: string; kind: string; minzoom?: number }[] = [
+    { id: "crags-isolated", kind: "obszar" },
+    { id: "crags-loose", kind: "region", minzoom: ZOOM.looseCragsFrom },
+    { id: "crags-sector", kind: "sektor", minzoom: ZOOM.sectorCragsFrom },
+  ];
+  return groups.flatMap(({ id, kind, minzoom }) => {
+    const filter = e(["==", ["get", "area_kind"], kind]);
+    const opacity = minzoom === undefined ? 1 : fadeIn(minzoom);
+    return [
+      {
+        id,
+        type: "circle",
+        ...(minzoom === undefined ? {} : { minzoom }),
+        filter,
+        paint: {
+          "circle-radius": e(["interpolate", ["linear"], ["zoom"], 9, 4, 15, 7]),
+          "circle-color": c.brand,
+          "circle-stroke-color": c.halo,
+          "circle-stroke-width": 1.5,
+          "circle-opacity": opacity,
+          "circle-stroke-opacity": opacity,
+        },
+      },
+      {
+        id: `${id}-labels`,
+        type: "symbol",
+        minzoom: Math.max(minzoom ?? 0, 12),
+        filter,
+        layout: {
+          "text-field": e(["get", "name"]),
+          "text-font": FONT,
+          "text-size": 11,
+          "text-offset": [0, 0.9],
+          "text-anchor": "top",
+          "text-optional": true,
+        },
+        paint: labelPaint(c),
+      },
+    ] satisfies LayerProps[];
+  });
+}
