@@ -22,6 +22,12 @@ dependencies = [
 [project.scripts]
 topo = "topo.cli:app"
 
+[project.optional-dependencies]
+depth = [
+    "torch>=2.4",
+    "transformers>=4.45",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=8",
@@ -36,3 +42,5 @@ packages = ["topo"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["slow: wymaga modelu głębi (torch, transformers) — uruchamiaj w usłudze depth: pytest -m slow"]
+addopts = "-m 'not slow'"

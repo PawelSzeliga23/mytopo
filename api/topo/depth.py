@@ -15,6 +15,14 @@ from topo.models import Wall
 
 DEPTH_MAX = 768
 DEPTH_FILE = "depth.png"
+MODELS = {
+    "large": "depth-anything/Depth-Anything-V2-Large-hf",
+    "small": "depth-anything/Depth-Anything-V2-Small-hf",
+}
+
+
+def model_name(key: str) -> str:
+    return f"depth-anything-v2-{key}"
 
 
 class DepthEstimator(Protocol):
@@ -130,3 +138,23 @@ def run_depth(
         report.done += 1
         log(f"[{index}/{len(walls)}] {label}: ok ({time.perf_counter() - started:.1f} s)")
     return report
+
+
+class HFDepthEstimator:
+    """Depth Anything V2 via transformers; torch is imported here so the api image works without it."""
+
+    def __init__(self, model: str = "large", device: str | None = None) -> None:
+        import torch
+        from transformers import AutoImageProcessor, AutoModelForDepthEstimation
+
+        self._torch = torch
+        self.name = model_name(model)
+        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self._processor = AutoImageProcessor.from_pretrained(MODELS[model])
+        self._model = AutoModelForDepthEstimation.from_pretrained(MODELS[model]).to(self.device).eval()
+
+    def predict(self, image: Image.Image) -> np.ndarray:
+        inputs = self._processor(images=image, return_tensors="pt").to(self.device)
+        with self._torch.inference_mode():
+            predicted = self._model(**inputs).predicted_depth
+        return predicted.squeeze().float().cpu().numpy()
