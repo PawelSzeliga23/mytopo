@@ -27,6 +27,7 @@
   --brand: #c2541b;
   --brand-foreground: #f4ecdd;
   --map-bg: #e9ddc6;
+  color-scheme: light;
 }
 
 .dark {
@@ -51,6 +52,7 @@
   --brand: #e2763a;
   --brand-foreground: #1d1916;
   --map-bg: #26201c;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -81,6 +83,7 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --shadow-float: 0 4px 14px rgba(43, 36, 32, 0.18);
 }
 
 @layer base {

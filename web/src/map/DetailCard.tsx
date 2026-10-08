@@ -60,7 +60,7 @@ export function DetailCard({ selection, onClose, onZoom, onOpenCrag }: CardProps
   if (isDesktop) {
     if (selection === null) return null;
     return (
-      <aside className="absolute right-3 top-3 z-20 w-80 rounded-[10px] bg-background p-4 shadow-[0_4px_14px_rgba(43,36,32,0.18)]">
+      <aside className="absolute right-3 top-3 z-20 w-80 rounded-[10px] bg-background p-4 shadow-float">
         <button type="button" aria-label="Zamknij" onClick={onClose} className="absolute right-3 top-2 text-lg text-muted-foreground hover:text-foreground">
           ×
         </button>

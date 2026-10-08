@@ -14,15 +14,15 @@ describe("warstwy mapy", () => {
     }
   });
 
-  it("sektory widoczne w środkowym zakresie", () => {
-    for (const layer of sectorLayers(colors)) {
-      if ("minzoom" in layer) {
-        expect(layer.minzoom).toBe(ZOOM.sectorsFrom);
-      }
-      if ("maxzoom" in layer) {
-        expect(layer.maxzoom).toBe(ZOOM.sectorsUntil);
-      }
+  it("sektory: wypełnienie i nazwy w środkowym zakresie, obrys zostaje przy dużym przybliżeniu", () => {
+    const byId = Object.fromEntries(sectorLayers(colors).map((layer) => [layer.id ?? "", layer]));
+    for (const id of ["sector-fill", "sector-outline", "sector-labels"]) {
+      expect("minzoom" in byId[id] ? byId[id].minzoom : undefined).toBe(ZOOM.sectorsFrom);
     }
+    expect("maxzoom" in byId["sector-fill"] ? byId["sector-fill"].maxzoom : undefined).toBe(ZOOM.sectorsUntil);
+    expect("maxzoom" in byId["sector-labels"] ? byId["sector-labels"].maxzoom : undefined).toBe(ZOOM.sectorsUntil);
+    expect("maxzoom" in byId["sector-outline"] ? byId["sector-outline"].maxzoom : undefined).toBeUndefined();
+    expect(ZOOM.sectorsUntil).toBe(15);
   });
 
   it("test_crag_groups_have_zoom_gates", () => {

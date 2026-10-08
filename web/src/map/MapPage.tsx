@@ -1,7 +1,8 @@
 import "@/map/worker";
 import { useMemo, useRef, useState } from "react";
 import Map, { Layer, Source, type MapLayerMouseEvent, type MapRef } from "react-map-gl/maplibre";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
+import { formatViewHash, parseViewHash } from "@/map/view";
 import { aggregateBands } from "@/lib/aggregate";
 import type { AreaProps, CragProps } from "@/lib/api";
 import { useTheme } from "@/lib/theme";
@@ -40,6 +41,9 @@ function byId<P extends { id: number }>(collection?: { features: { properties: P
 export default function MapPage() {
   const { theme } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
+  // The map view lives in the URL hash, so going back from a crag page (or reloading) restores it.
+  const [initialView] = useState(() => parseViewHash(location.hash) ?? INITIAL_VIEW);
   const mapRef = useRef<MapRef>(null);
   const [base, setBase] = useState<BaseLayer>(readBase);
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -91,7 +95,7 @@ export default function MapPage() {
     <div className="fixed inset-0 bg-map-bg">
       <Map
         ref={mapRef}
-        initialViewState={INITIAL_VIEW}
+        initialViewState={initialView}
         mapStyle={style}
         interactiveLayerIds={INTERACTIVE_LAYERS}
         onClick={handleClick}
@@ -99,6 +103,7 @@ export default function MapPage() {
           setCursor(event.features?.some((feature) => isClickableAt(feature.layer.id, event.target.getZoom())) ? "pointer" : "")
         }
         onMouseLeave={() => setCursor("")}
+        onMoveEnd={(event) => navigate({ hash: formatViewHash(event.viewState) }, { replace: true })}
         cursor={cursor}
         style={{ position: "absolute", inset: 0 }}
         attributionControl={{ compact: true }}

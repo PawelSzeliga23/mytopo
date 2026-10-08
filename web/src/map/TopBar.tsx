@@ -1,7 +1,7 @@
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
-const floating = "rounded-[10px] bg-background shadow-[0_4px_14px_rgba(43,36,32,0.18)]";
+const floating = "rounded-[10px] bg-background shadow-float";
 
 export function TopBar() {
   return (

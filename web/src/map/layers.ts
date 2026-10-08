@@ -5,7 +5,7 @@ import type { Theme } from "@/lib/theme";
 export const ZOOM = {
   regionsUntil: 10.5,
   sectorsFrom: 10,
-  sectorsUntil: 14,
+  sectorsUntil: 15,
   looseCragsFrom: 10,
   sectorCragsFrom: 12.5,
 } as const;
@@ -67,22 +67,22 @@ export function regionLayers(c: MapColors): LayerProps[] {
 
 export function sectorLayers(c: MapColors): LayerProps[] {
   const { sectorsFrom: from, sectorsUntil: until } = ZOOM;
-  const visible = e(["interpolate", ["linear"], ["zoom"], from, 0, from + 0.5, 1, until - 0.5, 1, until, 0]);
-  const opacityWithFade = e(["interpolate", ["linear"], ["zoom"], from, 0, from + 0.5, 0.35, until - 0.5, 0.35, until, 0]);
+  const labelOpacity = e(["interpolate", ["linear"], ["zoom"], from, 0, from + 0.5, 1, until - 0.5, 1, until, 0]);
+  const fillOpacity = e(["interpolate", ["linear"], ["zoom"], from, 0, from + 0.5, 0.35, until - 0.5, 0.35, until, 0]);
   return [
     {
       id: "sector-fill",
       type: "fill",
       minzoom: from,
       maxzoom: until,
-      paint: { "fill-color": c.surface, "fill-opacity": opacityWithFade },
+      paint: { "fill-color": c.surface, "fill-opacity": fillOpacity },
     },
+    // The outline stays at every closer zoom, so a sector's extent is visible next to its crags; only its name goes.
     {
       id: "sector-outline",
       type: "line",
       minzoom: from,
-      maxzoom: until,
-      paint: { "line-color": c.brand, "line-width": 1.2, "line-opacity": visible },
+      paint: { "line-color": c.brand, "line-width": 1.2, "line-opacity": fadeIn(from) },
     },
     {
       id: "sector-labels",
@@ -90,7 +90,7 @@ export function sectorLayers(c: MapColors): LayerProps[] {
       minzoom: from,
       maxzoom: until,
       layout: { "text-field": e(["get", "name"]), "text-font": FONT, "text-size": 12 },
-      paint: labelPaint(c, visible),
+      paint: labelPaint(c, labelOpacity),
     },
   ];
 }
