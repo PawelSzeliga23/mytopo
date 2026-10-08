@@ -33,6 +33,10 @@ export interface CragProps {
   in_sector: boolean;
   route_count: number;
   grade_bands: number[];
+  grade_min: string | null;
+  grade_min_sort: number | null;
+  grade_max: string | null;
+  grade_max_sort: number | null;
 }
 
 export interface AreaRef {
@@ -40,6 +44,58 @@ export interface AreaRef {
   name: string;
   slug: string;
   kind: AreaKind;
+}
+
+export type PointKind = "start" | "ring" | "hak" | "ucho" | "stanowisko" | "ogranicznik" | "przelot";
+
+export interface PointOut {
+  id: number;
+  sort_order: number;
+  /** 0–1, relative to the photo */
+  x: number;
+  y: number;
+  kind: PointKind;
+  visible: boolean;
+}
+
+export interface LineOut {
+  id: number;
+  route_id: number | null;
+  color: string;
+  sort_order: number;
+  parent_line_id: number | null;
+  parent_point_id: number | null;
+  points: PointOut[];
+}
+
+export interface WallOut {
+  id: number;
+  name: string | null;
+  description: string | null;
+  sort_order: number;
+  version: number;
+  image_url: string | null;
+  thumb_url: string | null;
+  image_width: number | null;
+  image_height: number | null;
+  depth_url: string | null;
+  depth_status: string;
+  depth_model: string | null;
+  lines: LineOut[];
+}
+
+export interface RouteOut {
+  id: number;
+  number: number | null;
+  name: string;
+  grade: string | null;
+  grade_fr: string | null;
+  grade_sort: number | null;
+  length_m: number | null;
+  protection: string | null;
+  first_ascent: string | null;
+  year: number | null;
+  description: string | null;
 }
 
 export interface CragDetail {
@@ -55,7 +111,14 @@ export interface CragDetail {
   aspects: string[];
   approach_minutes: number | null;
   child_friendly: boolean | null;
+  formations: string[];
+  surroundings: string | null;
   description: string | null;
+  approach_description: string | null;
+  source: string;
+  source_url: string | null;
+  walls: WallOut[];
+  routes: RouteOut[];
 }
 
 export async function getJson<T>(path: string): Promise<T> {

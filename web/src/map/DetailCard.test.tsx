@@ -1,8 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
-import type { AreaProps, CragProps } from "@/lib/api";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { AreaProps, CragProps, RouteOut } from "@/lib/api";
 import { ThemeProvider } from "@/lib/theme";
 import { DetailCard, DetailCardBody } from "@/map/DetailCard";
 
@@ -21,44 +22,82 @@ const region: AreaProps = {
 };
 const crag: CragProps = {
   id: 7, name: "Żabi Koń", slug: "zabi-kon", area_id: 102, area_kind: "sektor", in_sector: true,
-  route_count: 1, grade_bands: [1, 0, 0, 0],
+  route_count: 1, grade_bands: [1, 0, 0, 0], grade_min: "V", grade_min_sort: 80, grade_max: "VI.3", grade_max_sort: 160,
 };
+const route = (id: number, number: number, name: string): RouteOut => ({
+  id, number, name, grade: "VI.1", grade_fr: "6b", grade_sort: 120, length_m: null, protection: null,
+  first_ascent: null, year: null, description: null,
+});
 
-const wrap = (ui: ReactNode) => render(<ThemeProvider>{ui}</ThemeProvider>);
+function stubCrag(routes: RouteOut[]) {
+  vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(JSON.stringify({ routes, walls: [] })))));
+}
+
+function wrap(ui: ReactNode) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const providers = (node: ReactNode) => (
+    <ThemeProvider>
+      <QueryClientProvider client={client}>{node}</QueryClientProvider>
+    </ThemeProvider>
+  );
+  const view = render(providers(ui));
+  return { rerender: (node: ReactNode) => view.rerender(providers(node)) };
+}
+
+const handlers = () => ({ onZoom: vi.fn(), onOpenCrag: vi.fn(), onSelectCrag: vi.fn() });
+
+beforeEach(() => stubCrag([]));
+afterEach(() => vi.unstubAllGlobals());
 
 describe("DetailCardBody", () => {
   it("region: liczby po polsku i przybliżanie", async () => {
-    const onZoom = vi.fn();
-    wrap(<DetailCardBody selection={{ type: "region", area: region, bands: [5, 4, 3, 1] }} onZoom={onZoom} onOpenCrag={vi.fn()} />);
+    const props = handlers();
+    wrap(<DetailCardBody selection={{ type: "region", area: region, bands: [5, 4, 3, 1], range: null, crags: [] }} {...props} />);
     expect(screen.getByText("Region")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Dolina Kobylańska" })).toBeInTheDocument();
     expect(screen.getByText("49 skał")).toBeInTheDocument();
     expect(screen.getByText("645 dróg")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Przybliż" }));
-    expect(onZoom).toHaveBeenCalledWith([19.7, 50.1, 19.8, 50.2]);
+    expect(props.onZoom).toHaveBeenCalledWith([19.7, 50.1, 19.8, 50.2]);
   });
 
-  it("skała: otwieranie strony skały", async () => {
-    const onOpenCrag = vi.fn();
-    wrap(<DetailCardBody selection={{ type: "crag", crag }} onZoom={vi.fn()} onOpenCrag={onOpenCrag} />);
+  it("region: zakres wycen i lista skał", async () => {
+    const props = handlers();
+    const crags = Array.from({ length: 10 }, (_, i) => ({ ...crag, id: 100 + i, name: `Skała ${i}`, route_count: i }));
+    const range = { min: "IV", minSort: 60, max: "VI.3", maxSort: 160 };
+    wrap(<DetailCardBody selection={{ type: "region", area: region, bands: [1, 1, 1, 1], range, crags }} {...props} />);
+    expect(screen.getByText("IV – VI.3")).toBeInTheDocument();
+    const buttons = within(screen.getByRole("list", { name: "Skały" })).getAllByRole("button");
+    expect(buttons).toHaveLength(8);
+    expect(buttons[0]).toHaveTextContent("Skała 9");
+    expect(screen.getByText("i jeszcze 2 skały")).toBeInTheDocument();
+    await userEvent.click(buttons[0]);
+    expect(props.onSelectCrag).toHaveBeenCalledWith(crags[9]);
+  });
+
+  it("skała: zakres wycen, pierwsze drogi i przejście do reszty", async () => {
+    stubCrag(Array.from({ length: 10 }, (_, i) => route(i + 1, 10 - i, `Droga ${10 - i}`)));
+    const props = handlers();
+    wrap(<DetailCardBody selection={{ type: "crag", crag }} {...props} />);
     expect(screen.getByText("Skała")).toBeInTheDocument();
     expect(screen.getByText("1 droga")).toBeInTheDocument();
+    expect(screen.getByText("V – VI.3")).toBeInTheDocument();
+    const items = within(await screen.findByRole("list", { name: "Drogi" })).getAllByRole("listitem");
+    expect(items).toHaveLength(8);
+    expect(items[0]).toHaveTextContent("Droga 1");
+    await userEvent.click(screen.getByRole("button", { name: "i jeszcze 2 drogi →" }));
+    expect(props.onOpenCrag).toHaveBeenCalledWith("zabi-kon");
     await userEvent.click(screen.getByRole("button", { name: "Otwórz skałę" }));
-    expect(onOpenCrag).toHaveBeenCalledWith("zabi-kon");
+    expect(props.onOpenCrag).toHaveBeenCalledTimes(2);
   });
 });
 
 describe("DetailCard (telefon)", () => {
-  it("zachowuje treść karty podczas zamykania szuflady", async () => {
-    
-    const props = { onClose: vi.fn(), onZoom: vi.fn(), onOpenCrag: vi.fn() };
+  it("zachowuje treść karty podczas zamykania szuflady", () => {
+    const props = { onClose: vi.fn(), ...handlers() };
     const view = wrap(<DetailCard selection={{ type: "crag", crag }} {...props} />);
     expect(screen.getByRole("heading", { name: "Żabi Koń" })).toBeInTheDocument();
-    view.rerender(
-      <ThemeProvider>
-        <DetailCard selection={null} {...props} />
-      </ThemeProvider>,
-    );
+    view.rerender(<DetailCard selection={null} {...props} />);
     expect(screen.getByRole("heading", { name: "Żabi Koń" })).toBeInTheDocument();
   });
 });

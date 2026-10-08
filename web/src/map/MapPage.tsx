@@ -3,7 +3,7 @@ import { useMemo, useRef, useState } from "react";
 import Map, { Layer, Source, type MapLayerMouseEvent, type MapRef } from "react-map-gl/maplibre";
 import { useLocation, useNavigate } from "react-router";
 import { formatViewHash, parseViewHash } from "@/map/view";
-import { aggregateBands } from "@/lib/aggregate";
+import { aggregateBands, aggregateRanges, cragsByArea } from "@/lib/aggregate";
 import type { AreaProps, CragProps } from "@/lib/api";
 import { useTheme } from "@/lib/theme";
 import { DetailCard } from "@/map/DetailCard";
@@ -60,6 +60,18 @@ export default function MapPage() {
     () => aggregateBands([...index.sectors.values()], [...index.crags.values()]),
     [index],
   );
+  const ranges = useMemo(
+    () => aggregateRanges([...index.sectors.values()], [...index.crags.values()]),
+    [index],
+  );
+  const cragLists = useMemo(
+    () => cragsByArea([...index.sectors.values()], [...index.crags.values()]),
+    [index],
+  );
+  const cragCenters = useMemo(
+    () => new globalThis.Map((crags?.features ?? []).map((feature) => [feature.properties.id, feature.geometry.coordinates as [number, number]])),
+    [crags],
+  );
 
   // Feature properties coming back from MapLibre lose nested arrays (bbox, bands), so look the originals up by id.
   function handleClick(event: MapLayerMouseEvent) {
@@ -73,7 +85,15 @@ export default function MapPage() {
     const layer = feature.layer.id;
     if (layer === "region-points" || layer === "sector-fill") {
       const area = (layer === "region-points" ? index.regions : index.sectors).get(id);
-      if (area) setSelection({ type: area.kind === "sektor" ? "sektor" : "region", area, bands: bands.get(id) ?? [0, 0, 0, 0] });
+      if (area) {
+        setSelection({
+          type: area.kind === "sektor" ? "sektor" : "region",
+          area,
+          bands: bands.get(id) ?? [0, 0, 0, 0],
+          range: ranges.get(id) ?? null,
+          crags: cragLists.get(id) ?? [],
+        });
+      }
       return;
     }
     const crag = index.crags.get(id);
@@ -89,6 +109,13 @@ export default function MapPage() {
       { padding: 80, duration: 800 },
     );
     setSelection(null);
+  }
+
+  function selectCrag(crag: CragProps) {
+    setSelection({ type: "crag", crag });
+    const center = cragCenters.get(crag.id);
+    const map = mapRef.current;
+    if (center && map) map.flyTo({ center, zoom: Math.max(map.getZoom(), 15), duration: 800 });
   }
 
   return (
@@ -147,6 +174,7 @@ export default function MapPage() {
         selection={selection}
         onClose={() => setSelection(null)}
         onZoom={zoomTo}
+        onSelectCrag={selectCrag}
         onOpenCrag={(slug) => navigate(`/skaly/${slug}`)}
       />
     </div>
