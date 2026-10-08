@@ -1,6 +1,6 @@
 import "@/map/worker";
 import { useMemo, useRef, useState } from "react";
-import Map, { Layer, Source, type MapLayerMouseEvent, type MapRef } from "react-map-gl/maplibre";
+import Map, { AttributionControl, Layer, Source, type MapLayerMouseEvent, type MapRef } from "react-map-gl/maplibre";
 import { useLocation, useNavigate } from "react-router";
 import { formatViewHash, parseViewHash } from "@/map/view";
 import { aggregateBands, aggregateRanges, cragsByArea } from "@/lib/aggregate";
@@ -133,7 +133,7 @@ export default function MapPage() {
         onMoveEnd={(event) => navigate({ hash: formatViewHash(event.viewState) }, { replace: true })}
         cursor={cursor}
         style={{ position: "absolute", inset: 0 }}
-        attributionControl={{ compact: true }}
+        attributionControl={false}
       >
         {sectors && (
           <Source id="sectors" type="geojson" data={sectors}>
@@ -156,6 +156,8 @@ export default function MapPage() {
             ))}
           </Source>
         )}
+        {/* Bottom-left, so the base-layer switcher in the bottom-right corner never covers it. */}
+        <AttributionControl position="bottom-left" compact />
       </Map>
       <TopBar />
       <LayerSwitcher
