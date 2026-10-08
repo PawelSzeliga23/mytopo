@@ -2108,3 +2108,22 @@ git commit -m "docs: raport z próbnego importu (Dolina Kobylańska)" -m "Co-Aut
 
 - Pełny import wszystkich ~635 skał (2–3 h, ok. 3,8 GB) uruchamia autor, kiedy zechce: `docker compose run --rm api topo import portalgorski`. Dzięki cache można go przerwać i wznowić.
 - Następny krok: plan 3 — rozmowa o designie i mockupy (spec §6.0), potem szkielet frontu i mapa.
+
+## Wnioski z wykonania (do uwzględnienia w kolejnych planach)
+
+Decyzje podjęte podczas wykonania (po przeglądach):
+- Każda ściana z `topoEditor_<id>` na stronie skały trafia do bazy, nawet gdy nie da się odczytać jej nazwy/opisu.
+- Import nigdy nie odtwarza rekordu, który ktoś usunął ręcznie (jakakolwiek ręczna wersja dla `(source, source_id)`); topo ściany jest zamrożone, jeśli którakolwiek jej linia lub punkt ma ręczną wersję (także usunięte).
+- Ta sama droga na kilku zdjęciach jednej skały (ta sama nazwa po normalizacji i wycena) to jeden rekord `route`; numer zostaje z pierwszej ściany — numerację „jak na topo” liczy front osobno dla każdego zdjęcia (plan 4).
+- Typy punktów z prawdziwych danych: `spit`→`ring`, `ring zjazdowy`→`stanowisko`, `pętla`→`ucho`, `niewidoczny fragment drogi`→`przelot`; nieznany widoczny typ → niewidoczny `przelot` + wpis w raporcie.
+- Gdy portal nie odda topo ściany (błąd, `status != 1`), istniejące drogi i linie tej ściany zostają nietknięte, a złą odpowiedź usuwa się z cache.
+- Historia: własny `_TopoUnitOfWork` (Continuum zapisuje wersje w transakcji wywołującego) — zależy od wnętrza Continuum 1.8.
+
+Do zrobienia przed pełnym importem (~635 skał):
+- Nie łączyć dróg bez wyceny (np. „projekt”) między ścianami — dziś jeden taki przypadek (Czarna Ścianka).
+
+Do zdecydowania w kolejnych planach:
+- **Plan 5 (głębia):** zapisy workera głębi do `wall` podpisywać autorem z prefiksem `import:` (np. `import:depth`) albo wyłączyć `depth_*` z wersjonowania (`__versioned__ = {"exclude": [...]}`) — inaczej ściany wyglądają na „ręcznie edytowane” i import przestaje je aktualizować.
+- **Plan 6/7 (edycja, wgrywanie):** `is_manually_edited` ma liczyć wersje bez wiersza `transaction` jako ręczne (dziś po wycofanym `begin_nested()` mogą zostać osierocone wersje); przypiąć `sqlalchemy-continuum<1.9` lub test zamieniający SAWarning w błąd; `issued_at` → `timestamptz`; indeksy `(source, source_id)` na tabelach `*_version`; `store_wall_image` ma opakowywać `DecompressionBombError`/błędy EXIF jako `InvalidImage`, zapisywać atomowo i usuwać stary `original.<ext>`; sprzątanie plików po wycofanym imporcie.
+- Migracja 0003 w dół nie przejdzie, gdy istnieją punkty `ogranicznik`.
+- Drobne: `wall.source_url` wskazuje na zdjęcie, nie stronę skały; `--only-area` dopasowuje podciąg całego adresu.
