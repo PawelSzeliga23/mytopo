@@ -22,7 +22,11 @@ def crag_summaries(session: Session, area_id: int | None = None) -> list[dict[st
                    count(r.id) FILTER (WHERE r.grade_sort < :b1)::int AS band0,
                    count(r.id) FILTER (WHERE r.grade_sort >= :b1 AND r.grade_sort < :b2)::int AS band1,
                    count(r.id) FILTER (WHERE r.grade_sort >= :b2 AND r.grade_sort < :b3)::int AS band2,
-                   count(r.id) FILTER (WHERE r.grade_sort >= :b3)::int AS band3
+                   count(r.id) FILTER (WHERE r.grade_sort >= :b3)::int AS band3,
+                   (array_agg(r.grade ORDER BY r.grade_sort, r.id) FILTER (WHERE r.grade_sort IS NOT NULL))[1] AS grade_min,
+                   min(r.grade_sort)::int AS grade_min_sort,
+                   (array_agg(r.grade ORDER BY r.grade_sort DESC, r.id) FILTER (WHERE r.grade_sort IS NOT NULL))[1] AS grade_max,
+                   max(r.grade_sort)::int AS grade_max_sort
             FROM crag c
             JOIN area a ON a.id = c.area_id
             LEFT JOIN route r ON r.crag_id = c.id
@@ -44,6 +48,10 @@ def crag_summaries(session: Session, area_id: int | None = None) -> list[dict[st
             "lat": r["lat"],
             "route_count": r["route_count"],
             "grade_bands": [r["band0"], r["band1"], r["band2"], r["band3"]],
+            "grade_min": r["grade_min"],
+            "grade_min_sort": r["grade_min_sort"],
+            "grade_max": r["grade_max"],
+            "grade_max_sort": r["grade_max_sort"],
         }
         for r in rows
     ]

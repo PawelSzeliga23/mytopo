@@ -53,6 +53,10 @@ def test_map_crags_with_grade_bands(client, session):
     assert by_name["Samotna"]["properties"]["in_sector"] is False
     assert zabi["properties"]["area_kind"] == "sektor"
     assert by_name["Samotna"]["properties"]["area_kind"] == "region"
+    assert (zabi["properties"]["grade_min"], zabi["properties"]["grade_max"]) == ("V+", "VI.5")
+    assert zabi["properties"]["grade_min_sort"] < zabi["properties"]["grade_max_sort"]
+    samotna = by_name["Samotna"]["properties"]
+    assert (samotna["grade_min"], samotna["grade_max"]) == ("IV", "IV")
 
 
 def test_map_areas_rejects_unknown_kind(client):
@@ -67,3 +71,14 @@ def test_unknown_api_path_uses_error_format(client):
     response = client.get("/api/nie-ma-takiej-strony")
     assert response.status_code == 404
     assert response.json()["code"] == "not_found"
+
+
+def test_map_crag_without_graded_routes_has_no_range(client, session):
+    region = f.area(session, "Dolina")
+    crag = f.crag(session, region, "Projekty")
+    f.route(session, crag, "P", grade=None)
+
+    [feature] = client.get("/api/map/crags").json()["features"]
+    props = feature["properties"]
+    assert (props["grade_min"], props["grade_max"]) == (None, None)
+    assert (props["grade_min_sort"], props["grade_max_sort"]) == (None, None)

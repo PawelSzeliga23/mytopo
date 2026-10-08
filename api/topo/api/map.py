@@ -67,7 +67,7 @@ def map_crags(session: Session = Depends(get_session)) -> dict[str, Any]:
         [
             _feature(
                 {"type": "Point", "coordinates": [round(c["lng"], 6), round(c["lat"], 6)]},
-                {key: c[key] for key in ("id", "name", "slug", "area_id", "in_sector", "area_kind", "route_count", "grade_bands")},
+                {key: c[key] for key in ("id", "name", "slug", "area_id", "in_sector", "area_kind", "route_count", "grade_bands", "grade_min", "grade_min_sort", "grade_max", "grade_max_sort")},
             )
             for c in crag_summaries(session)
         ]

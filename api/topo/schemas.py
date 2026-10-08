@@ -90,6 +90,10 @@ class CragSummary(BaseModel):
     slug: str
     route_count: int
     grade_bands: list[int]
+    grade_min: str | None
+    grade_min_sort: int | None
+    grade_max: str | None
+    grade_max_sort: int | None
 
 
 class AreaChild(BaseModel):
