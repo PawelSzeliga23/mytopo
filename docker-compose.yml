@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: topo
+      POSTGRES_PASSWORD: topo
+      POSTGRES_DB: topo
+    command: ["postgres", "-c", "shared_buffers=64MB"]
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./db/init/01-test-db.sql:/docker-entrypoint-initdb.d/01-test-db.sql:ro
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U topo -d topo"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: ./api
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://topo:topo@db:5432/topo}
+      TEST_DATABASE_URL: ${TEST_DATABASE_URL:-postgresql+psycopg://topo:topo@db:5432/topo_test}
+    command: ["uvicorn", "topo.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    volumes:
+      - ./api:/app
+      - media:/data/media
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db-data:
+  media:
