@@ -1,8 +1,14 @@
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+logger = logging.getLogger(__name__)
+
+_HTTP_MESSAGES = {405: "Niedozwolona metoda"}
 
 
 class ApiError(Exception):
@@ -37,4 +43,13 @@ def install_error_handlers(app: FastAPI) -> None:
     async def handle_http(request: Request, exc: StarletteHTTPException) -> JSONResponse:
         if exc.status_code == 404:
             return JSONResponse({"code": "not_found", "message": "Nie znaleziono"}, status_code=404)
-        return JSONResponse({"code": "http_error", "message": str(exc.detail)}, status_code=exc.status_code)
+        return JSONResponse(
+            {"code": "http_error", "message": _HTTP_MESSAGES.get(exc.status_code, "Błąd żądania")},
+            status_code=exc.status_code,
+            headers=exc.headers,
+        )
+
+    @app.exception_handler(Exception)
+    async def handle_unexpected(request: Request, exc: Exception) -> JSONResponse:
+        logger.exception("Unhandled error on %s %s", request.method, request.url.path, exc_info=exc)
+        return JSONResponse({"code": "internal_error", "message": "Wewnętrzny błąd serwera"}, status_code=500)

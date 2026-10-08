@@ -36,8 +36,8 @@ class Crag(SourceMixin, Base):
 
     area: Mapped["Area"] = relationship(back_populates="crags")
     walls: Mapped[list["Wall"]] = relationship(
-        back_populates="crag", order_by="Wall.sort_order", cascade="all, delete-orphan"
+        back_populates="crag", order_by="(Wall.sort_order, Wall.id)", cascade="all, delete-orphan"
     )
     routes: Mapped[list["Route"]] = relationship(
-        back_populates="crag", order_by="Route.number", cascade="all, delete-orphan"
+        back_populates="crag", order_by="(Route.number.nulls_last(), Route.id)", cascade="all, delete-orphan"
     )

@@ -5,6 +5,7 @@ from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
 from topo.api.app import create_app
@@ -17,6 +18,12 @@ API_DIR = Path(__file__).resolve().parent.parent
 @pytest.fixture(scope="session")
 def engine():
     url = get_settings().test_database_url
+    database = make_url(url).database or ""
+    if not database.endswith("_test"):
+        pytest.fail(
+            f"Refusing to reset schema of database {database!r}: TEST_DATABASE_URL must point to a *_test database",
+            pytrace=False,
+        )
     eng = create_engine(url)
     with eng.begin() as conn:
         conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))

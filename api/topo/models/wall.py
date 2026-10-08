@@ -33,5 +33,5 @@ class Wall(SourceMixin, Base):
 
     crag: Mapped["Crag"] = relationship(back_populates="walls")
     lines: Mapped[list["RouteLine"]] = relationship(
-        back_populates="wall", order_by="RouteLine.sort_order", cascade="all, delete-orphan"
+        back_populates="wall", order_by="(RouteLine.sort_order, RouteLine.id)", cascade="all, delete-orphan"
     )

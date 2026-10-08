@@ -1,11 +1,11 @@
 import pytest
-from sqlalchemy import text
+from sqlalchemy import delete, text
 from sqlalchemy.exc import IntegrityError
 
 from tests import factories as f
 from topo.db import refresh_area_geom
 from topo.grades import grade_sort
-from topo.models import Area, Crag, LinePoint
+from topo.models import Area, Crag, LinePoint, RouteLine
 from topo.slugs import unique_slug
 
 
@@ -96,3 +96,91 @@ def test_unique_slug_uses_context_then_number(session):
     f.crag(session, region, "Kapliczka (2)", slug="kapliczka-dolina-kobylanska")
     assert unique_slug(session, Crag, "Kapliczka", ["Dolina Kobylańska"]) == "kapliczka-2"
     assert unique_slug(session, Crag, "Żabi Koń") == "zabi-kon"
+
+
+def test_area_cannot_be_its_own_parent(session):
+    region = f.area(session, "R")
+    with pytest.raises(IntegrityError):
+        session.execute(text("UPDATE area SET parent_id = id WHERE id = :id"), {"id": region.id})
+
+
+def test_area_geom_refresh_terminates_on_parent_cycle(session):
+    a = f.area(session, "A")
+    b = f.area(session, "B")
+    f.crag(session, a, "Skała A", lng=19.70, lat=50.17)
+    f.crag(session, b, "Skała B", lng=19.72, lat=50.18)
+    session.execute(text("UPDATE area SET parent_id = :b WHERE id = :a"), {"a": a.id, "b": b.id})
+    session.execute(text("UPDATE area SET parent_id = :a WHERE id = :b"), {"a": a.id, "b": b.id})
+    # Turn a regression (endless recursion) into a failure instead of a hang
+    session.execute(text("SET LOCAL statement_timeout = '10s'"))
+    refresh_area_geom(session)
+
+    counts = {r.area_id: r.crag_count for r in session.execute(text("SELECT area_id, crag_count FROM area_geom"))}
+    assert counts == {a.id: 2, b.id: 2}
+
+
+def test_variant_branch_point_must_belong_to_parent_line(session):
+    wall = f.wall(session, f.crag(session, f.area(session, "R"), "C"))
+    main = f.line(session, wall)
+    other = f.line(session, wall, sort_order=1)
+    session.add(
+        RouteLine(
+            wall=wall, parent_line_id=main.id, parent_point_id=other.points[1].id,
+            points=[LinePoint(sort_order=0, x=0.5, y=0.5, kind="start")],
+        )
+    )
+    with pytest.raises(IntegrityError):
+        session.flush()
+
+
+def test_variant_needs_both_parent_columns(session):
+    wall = f.wall(session, f.crag(session, f.area(session, "R"), "C"))
+    main = f.line(session, wall)
+    session.add(RouteLine(wall=wall, parent_line_id=main.id))
+    with pytest.raises(IntegrityError):
+        session.flush()
+
+
+def test_parent_line_and_variant_saved_in_one_flush(session):
+    wall = f.wall(session, f.crag(session, f.area(session, "R"), "C"))
+    main = RouteLine(
+        wall=wall,
+        points=[LinePoint(sort_order=i, x=0.5, y=y, kind=k) for i, (y, k) in enumerate([(0.9, "start"), (0.5, "ring")])],
+    )
+    variant = RouteLine(
+        wall=wall, sort_order=1, parent_line=main, parent_point=main.points[1],
+        points=[LinePoint(sort_order=0, x=0.6, y=0.3, kind="stanowisko")],
+    )
+    session.add_all([variant, main])
+    session.flush()
+    session.expire_all()
+
+    loaded = session.get(RouteLine, variant.id)
+    assert loaded.parent_line_id == main.id
+    assert loaded.parent_point_id == main.points[1].id
+    assert loaded.parent_line is main
+    assert loaded.parent_point is main.points[1]
+    assert [line.id for line in wall.lines] == [main.id, variant.id]
+
+
+def test_deleting_branch_point_detaches_variant(session):
+    wall = f.wall(session, f.crag(session, f.area(session, "R"), "C"))
+    main = f.line(session, wall)
+    variant = f.line(session, wall, sort_order=1, parent_line_id=main.id, parent_point_id=main.points[1].id)
+    session.execute(delete(LinePoint).where(LinePoint.id == main.points[1].id))
+    session.expire_all()
+
+    loaded = session.get(RouteLine, variant.id)
+    assert (loaded.parent_line_id, loaded.parent_point_id) == (None, None)
+
+
+def test_deleting_parent_line_detaches_variant(session):
+    wall = f.wall(session, f.crag(session, f.area(session, "R"), "C"))
+    main = f.line(session, wall)
+    variant = f.line(session, wall, sort_order=1, parent_line_id=main.id, parent_point_id=main.points[1].id)
+    session.execute(delete(RouteLine).where(RouteLine.id == main.id))
+    session.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))  # run the deferred FK check now, not at commit
+    session.expire_all()
+
+    loaded = session.get(RouteLine, variant.id)
+    assert (loaded.parent_line_id, loaded.parent_point_id) == (None, None)

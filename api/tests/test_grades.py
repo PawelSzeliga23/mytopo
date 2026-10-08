@@ -56,3 +56,8 @@ def test_grade_band(grade, band):
 )
 def test_to_french(grade, french):
     assert to_french(grade) == french
+
+
+def test_normalize_grade_strips_scraped_whitespace():
+    assert normalize_grade("\tV+ ") == "V+"
+    assert grade_sort("VI.1\xa0+") == grade_sort("VI.1+")

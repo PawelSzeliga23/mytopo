@@ -6,6 +6,7 @@ from bisect import bisect_right
 _BASES = ["I", "II", "III", "IV", "V", "VI"] + [f"VI.{n}" for n in range(1, 10)]
 _INDEX = {base: i for i, base in enumerate(_BASES)}
 _SINGLE = re.compile(r"^(VI\.[1-9]|VI|V|IV|III|II|I)([+-]?)$")
+_WHITESPACE = re.compile(r"\s+")
 _STEP = 20
 _MODIFIER = {"": 0, "+": 6, "-": -6}
 _DASHES = ("‐", "‑", "‒", "–", "—", "−")
@@ -24,10 +25,11 @@ _FRENCH = {
 
 
 def normalize_grade(raw: str) -> str:
-    grade = raw.strip().upper()
+    # \s on str also matches NBSP and tabs, common in scraped pages
+    grade = _WHITESPACE.sub("", raw).upper()
     for dash in _DASHES:
         grade = grade.replace(dash, "-")
-    return grade.replace(",", ".").replace(" ", "")
+    return grade.replace(",", ".")
 
 
 def _split(grade: str) -> tuple[str, str | None]:

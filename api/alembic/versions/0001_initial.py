@@ -18,7 +18,7 @@ AREA_GEOM_SQL = """
 CREATE MATERIALIZED VIEW area_geom AS
 WITH RECURSIVE tree(root_id, area_id) AS (
     SELECT id, id FROM area
-    UNION ALL
+    UNION
     SELECT t.root_id, a.id FROM area a JOIN tree t ON a.parent_id = t.area_id
 ),
 crag_routes AS (
@@ -59,6 +59,7 @@ def upgrade() -> None:
         sa.Column("description", sa.Text),
         *_source_columns(),
         sa.CheckConstraint("kind IN ('obszar', 'region', 'sektor')", name="ck_area_kind"),
+        sa.CheckConstraint("parent_id IS NULL OR parent_id <> id", name="ck_area_not_own_parent"),
         sa.UniqueConstraint("source", "source_id", name="uq_area_source"),
     )
     op.create_index("ix_area_parent_id", "area", ["parent_id"])
@@ -131,13 +132,22 @@ def upgrade() -> None:
         sa.Column("route_id", sa.Integer, sa.ForeignKey("route.id", ondelete="SET NULL")),
         sa.Column("color", sa.String(16), nullable=False, server_default="#e11d48"),
         sa.Column("sort_order", sa.Integer, nullable=False, server_default="0"),
-        sa.Column("parent_line_id", sa.Integer, sa.ForeignKey("route_line.id", ondelete="SET NULL")),
+        # Deferred NO ACTION, not SET NULL: nulling parent_line_id alone would violate ck_route_line_parent_pair;
+        # the composite fk_route_line_parent_point_id nulls both columns when the parent's points cascade away.
+        sa.Column(
+            "parent_line_id", sa.Integer, sa.ForeignKey("route_line.id", deferrable=True, initially="DEFERRED")
+        ),
         sa.Column("parent_point_id", sa.Integer),
         *_source_columns(),
         sa.UniqueConstraint("source", "source_id", name="uq_route_line_source"),
+        sa.CheckConstraint(
+            "(parent_line_id IS NULL) = (parent_point_id IS NULL)", name="ck_route_line_parent_pair"
+        ),
     )
     op.create_index("ix_route_line_wall_id", "route_line", ["wall_id"])
     op.create_index("ix_route_line_route_id", "route_line", ["route_id"])
+    op.create_index("ix_route_line_parent_line_id", "route_line", ["parent_line_id"])
+    op.create_index("ix_route_line_parent_point_id", "route_line", ["parent_point_id"])
 
     op.create_table(
         "line_point",
@@ -154,10 +164,17 @@ def upgrade() -> None:
         ),
         sa.CheckConstraint("x >= 0 AND x <= 1 AND y >= 0 AND y <= 1", name="ck_line_point_xy"),
         sa.UniqueConstraint("source", "source_id", name="uq_line_point_source"),
+        sa.UniqueConstraint("line_id", "id", name="uq_line_point_line_id_id"),
     )
     op.create_index("ix_line_point_line_id", "line_point", ["line_id"])
+    # A variant's branch point must belong to its parent line: composite FK onto uq_line_point_line_id_id.
     op.create_foreign_key(
-        "fk_route_line_parent_point_id", "route_line", "line_point", ["parent_point_id"], ["id"], ondelete="SET NULL"
+        "fk_route_line_parent_point_id",
+        "route_line",
+        "line_point",
+        ["parent_line_id", "parent_point_id"],
+        ["line_id", "id"],
+        ondelete="SET NULL",
     )
 
     op.create_table(
