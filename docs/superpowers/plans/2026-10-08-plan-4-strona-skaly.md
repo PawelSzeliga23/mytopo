@@ -2270,3 +2270,15 @@ git commit -m "feat: strona skały — zdjęcie ściany, miniatury, informacje i
 - Mapa: sektory widoczne do zoomu 15, obrysy zostają, karta z zakresem wycen i listami, widok w adresie.
 - Poza zakresem (kolejne plany): przełącznik i widok 2.5D (plan 5), testy E2E w Playwright ze spec §10 (do dodania, gdy będą dane testowe w bazie), wydzielenie logiki kliknięcia mapy do czystej funkcji (sugestia z przeglądu planu 3).
 - Następny krok: plan 5 — mapy głębi (GPU, CLI) i widok 2.5D.
+
+## Wnioski z wykonania (do kolejnych planów)
+
+- **Drzewa i roślinność przed ścianą w 2.5D (plan 5).** Mapa głębi nie usuwa drzew: drzewo przed skałą dostaje mniejszą głębię, więc siatka wypycha je jako „garb”, a na jego krawędziach powstają rozciągnięte trójkąty. Gorzej z liniami — punkt drogi zasłonięty gałęzią odczyta głębię drzewa i „wyskoczy” przed ścianę. Drzew nie usuwamy ze zdjęcia (to zmyślanie skały, a drzewa pomagają się orientować). Do planu 5:
+  - odporny odczyt głębi dla punktów linii: mediana z otoczenia punktu zamiast jednego piksela; punkt dużo bliższy niż sąsiedzi wzdłuż linii odrzucamy i bierzemy wartość interpolowaną z sąsiadów;
+  - opcjonalnie maska roślinności (model segmentacji w tym samym kroku CLI co mapa głębi) — w masce głębia spłaszczona do poziomu skały z otoczenia: drzewo widać na zdjęciu, ale nie tworzy garbu;
+  - furtka: przy ścianach mocno zasłoniętych widok 2D; w edytorze przełącznik „ta ściana bez 2.5D”.
+- **Strefa najechania na linię (2D).** Test w Playwright zgłosił, że linię trzeba trafić w ~3 px, choć `hitStrokeWidth={18}`; w kodzie Konva nie znaleziono przyczyny. Sprawdzić w prawdziwej przeglądarce; jeśli się potwierdzi — poprawić.
+- **Gesty dotykowe** (pinch, zwijanie zdjęcia na telefonie) sprawdzone testami i czytaniem kodu, nie na prawdziwym telefonie — sprawdzić na urządzeniu.
+- **Rozmiar paczki:** konva powiększyła główny plik JS do ~1,55 MB — warto wczytywać stronę skały leniwie (`React.lazy`), żeby mapa nie ładowała Konvy.
+- Drobne z przeglądów, do rozważenia: stan strony skały nie zeruje się przy zmianie `slug` (`key={slug}` utwardzi, gdy pojawią się linki skała→skała); „← Mapa” i logo to przyciski, nie linki (brak „otwórz w nowej karcie”); słabe testy cykli wariantów w `topo.test.ts`.
+- Po planie 4: podpis źródła mapy (ⓘ) przeniesiony na lewy dół, a przełącznik podkładu na sam prawy dół — wcześniej przełącznik nachodził na podpis.
