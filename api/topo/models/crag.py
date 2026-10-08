@@ -33,6 +33,8 @@ class Crag(SourceMixin, Base):
     aspects: Mapped[list[str]] = mapped_column(ARRAY(String(3)), default=list, server_default="{}")
     formations: Mapped[list[str]] = mapped_column(ARRAY(String(32)), default=list, server_default="{}")
     approach_minutes: Mapped[int | None]
+    child_friendly: Mapped[bool | None]
+    surroundings: Mapped[str | None] = mapped_column(String(100))
     description: Mapped[str | None] = mapped_column(Text)
     approach_description: Mapped[str | None] = mapped_column(Text)
 

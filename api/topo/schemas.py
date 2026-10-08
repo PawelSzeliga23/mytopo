@@ -34,6 +34,7 @@ class LineOut(BaseModel):
 class WallOut(BaseModel):
     id: int
     name: str | None
+    description: str | None
     sort_order: int
     version: int
     image_url: str | None
@@ -73,6 +74,8 @@ class CragOut(BaseModel):
     aspects: list[str]
     formations: list[str]
     approach_minutes: int | None
+    child_friendly: bool | None
+    surroundings: str | None
     description: str | None
     approach_description: str | None
     source: str

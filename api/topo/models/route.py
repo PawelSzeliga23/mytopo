@@ -89,7 +89,8 @@ class LinePoint(SourceMixin, Base):
     __table_args__ = (
         source_constraint("line_point"),
         CheckConstraint(
-            "kind IN ('start', 'ring', 'hak', 'ucho', 'stanowisko', 'przelot')", name="ck_line_point_kind"
+            "kind IN ('start', 'ring', 'hak', 'ucho', 'stanowisko', 'ogranicznik', 'przelot')",
+            name="ck_line_point_kind",
         ),
         CheckConstraint("x >= 0 AND x <= 1 AND y >= 0 AND y <= 1", name="ck_line_point_xy"),
         UniqueConstraint("line_id", "id", name="uq_line_point_line_id_id"),

@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import CheckConstraint, ForeignKey, String
+from sqlalchemy import CheckConstraint, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from topo.models.base import Base, SourceMixin, source_constraint
@@ -22,6 +22,7 @@ class Wall(SourceMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     crag_id: Mapped[int] = mapped_column(ForeignKey("crag.id", ondelete="CASCADE"), index=True)
     name: Mapped[str | None] = mapped_column(String(200))
+    description: Mapped[str | None] = mapped_column(Text)
     sort_order: Mapped[int] = mapped_column(default=0, server_default="0")
     version: Mapped[int] = mapped_column(default=1, server_default="1")
     image_original_path: Mapped[str | None] = mapped_column(String(500))

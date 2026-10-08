@@ -17,6 +17,7 @@ def _wall_out(wall: Wall) -> WallOut:
     return WallOut(
         id=wall.id,
         name=wall.name,
+        description=wall.description,
         sort_order=wall.sort_order,
         version=wall.version,
         image_url=media_url(wall.image_path),
@@ -72,6 +73,8 @@ def get_crag(slug: str, session: Session = Depends(get_session)) -> CragOut:
         aspects=crag.aspects,
         formations=crag.formations,
         approach_minutes=crag.approach_minutes,
+        child_friendly=crag.child_friendly,
+        surroundings=crag.surroundings,
         description=crag.description,
         approach_description=crag.approach_description,
         source=crag.source,
