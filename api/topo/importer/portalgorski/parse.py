@@ -125,7 +125,7 @@ def parse_paths(raw: bytes) -> WallTopo:
         raw_points = path.get("points") or []
         points = []
         for index, point in enumerate(raw_points):
-            kind, visible = map_point(point.get("kindName", ""), point.get("typeId"), index)
+            kind, visible = map_point(point.get("kindName") or "", point.get("typeId"), index)
             points.append(
                 PointData(
                     source_id=int(point["pointId"]),
@@ -133,7 +133,7 @@ def parse_paths(raw: bytes) -> WallTopo:
                     y=float(point["y"]),
                     kind=kind,
                     visible=visible,
-                    raw_kind=point.get("kindName", "").strip(),
+                    raw_kind=(point.get("kindName") or "").strip(),
                 )
             )
         parent_point = next((p["parentPointId"] for p in raw_points if p.get("parentPointId")), None)

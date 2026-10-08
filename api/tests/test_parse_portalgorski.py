@@ -145,3 +145,14 @@ def test_parse_rock_page_keeps_wall_with_unexpected_description_markup():
     page = parse_rock_page(broken.encode("utf-8"))
     assert [w.source_id for w in page.walls] == [45, 46, 2531]
     assert page.walls[1].image_url == BASE_URL + "/images/original/100/9ef/a98/9ef8a98_zabi_kon_1_JPG"
+
+
+def test_parse_paths_null_kind_name():
+    raw = (
+        b'{"status": 1, "data": [{"pathId": 1, "points": ['
+        b'{"pointId": 10, "x": 0.5, "y": 0.5, "kindName": null, "typeId": 1}, '
+        b'{"pointId": 11, "x": 0.5, "y": 0.4, "kindName": null, "typeId": 2}]}]}'
+    )
+    points = parse_paths(raw).lines[0].points
+    assert [p.kind for p in points] == ["start", "przelot"]
+    assert points[1].raw_kind == ""
