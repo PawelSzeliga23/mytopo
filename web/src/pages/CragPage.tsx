@@ -1,50 +1,125 @@
 import { useQuery } from "@tanstack/react-query";
-import { Fragment } from "react";
-import { Link, useParams } from "react-router";
-import { Chip } from "@/components/Chip";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router";
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { CragInfo } from "@/crag/CragInfo";
+import { RouteList } from "@/crag/RouteList";
+import { routeRows, type RouteRow } from "@/crag/topo";
+import { useCompactOnScroll } from "@/crag/useCompactOnScroll";
+import { WallThumbnails, wallLabel } from "@/crag/WallThumbnails";
+import { WallViewer } from "@/crag/WallViewer";
 import { api, ApiError } from "@/lib/api";
+import { useIsDesktop } from "@/lib/useMediaQuery";
+import { formatViewHash } from "@/map/view";
+
+const CRAG_ZOOM = 15;
 
 export default function CragPage() {
   const { slug = "" } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isDesktop = useIsDesktop();
+  const compact = useCompactOnScroll(!isDesktop);
   const { data: crag, error, isPending } = useQuery({ queryKey: ["crag", slug], queryFn: () => api.crag(slug) });
+  const [wallId, setWallId] = useState<number | null>(null);
+  const [selectedRouteId, setSelectedRouteId] = useState<number | null>(null);
+  const [hoveredRouteId, setHoveredRouteId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!crag) return;
+    document.title = `${crag.name} · topo`;
+    return () => {
+      document.title = "topo";
+    };
+  }, [crag]);
+
+  const routes = useMemo(() => new Map((crag?.routes ?? []).map((route) => [route.id, route])), [crag]);
+  const wall = crag?.walls.find((candidate) => candidate.id === wallId) ?? crag?.walls[0] ?? null;
+  const rows = useMemo(() => (crag ? routeRows(crag, wall?.id ?? null) : { onWall: [], other: [] }), [crag, wall]);
+  const wallNames = useMemo(() => new Map((crag?.walls ?? []).map((candidate, index) => [candidate.id, wallLabel(candidate, index)])), [crag]);
+
+  function backToMap() {
+    // Came from the map: go back, so the map restores its view from the URL. Opened from a link: show the map at this crag.
+    if (location.key !== "default") navigate(-1);
+    else navigate(crag ? `/${formatViewHash({ longitude: crag.lng, latitude: crag.lat, zoom: CRAG_ZOOM })}` : "/");
+  }
+
+  function chooseRow(row: RouteRow) {
+    if (row.wallId !== null && row.wallId !== wall?.id) setWallId(row.wallId);
+    setSelectedRouteId((current) => (current === row.route.id ? null : row.route.id));
+  }
+
+  const aspect = wall?.image_width && wall.image_height ? wall.image_height / wall.image_width : 4 / 3;
+  const viewerHeight = isDesktop ? "calc(100vh - 13rem)" : compact ? "30vh" : `min(${Math.round(aspect * 100)}vw, 65vh)`;
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4 p-4">
-      <header className="flex items-center justify-between">
-        <Link to="/" aria-label="Wróć do mapy">
+    <div className="mx-auto max-w-6xl px-4 pb-10 lg:px-6">
+      <header className="flex items-center justify-between py-3">
+        <button type="button" onClick={backToMap} aria-label="Wróć do mapy">
           <Logo />
-        </Link>
+        </button>
         <ThemeToggle />
       </header>
       {isPending && <p className="text-muted-foreground">Wczytywanie…</p>}
-      {error && (
-        <p role="alert">{error instanceof ApiError && error.status === 404 ? "Nie znaleziono skały" : error.message}</p>
-      )}
+      {error && <p role="alert">{error instanceof ApiError && error.status === 404 ? "Nie znaleziono skały" : error.message}</p>}
       {crag && (
-        <>
-          <nav className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-            <Link to="/">← Mapa</Link>
-            {crag.path.map((area) => (
-              <Fragment key={area.id}>
-                {" · "}
-                <span>{area.name}</span>
-              </Fragment>
-            ))}
-          </nav>
-          <h1 className="font-display text-4xl font-extrabold tracking-tight">{crag.name}</h1>
-          <div className="flex flex-wrap gap-1.5">
-            {crag.rock_type && <Chip>{crag.rock_type}</Chip>}
-            {crag.height_min !== null && crag.height_max !== null && <Chip>{`${crag.height_min}–${crag.height_max} m`}</Chip>}
-            {crag.aspects.length > 0 && <Chip>{crag.aspects.join(", ")}</Chip>}
-            {crag.approach_minutes !== null && <Chip>{`dojście ${crag.approach_minutes} min`}</Chip>}
-            {crag.child_friendly && <Chip>dla dzieci</Chip>}
+        <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[58fr_42fr] lg:items-start lg:gap-8">
+          {/* Phone: "contents" makes these direct children of the long column, so the photo can stick while the list scrolls. */}
+          <div className="contents lg:sticky lg:top-4 lg:flex lg:flex-col lg:gap-3">
+            <div>
+              <nav className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                <button type="button" onClick={backToMap} className="uppercase hover:text-foreground">
+                  ← Mapa
+                </button>
+                {crag.path.map((area) => (
+                  <Fragment key={area.id}>
+                    {" · "}
+                    <span>{area.name}</span>
+                  </Fragment>
+                ))}
+              </nav>
+              <h1 className="font-display text-4xl font-extrabold tracking-tight">{crag.name}</h1>
+            </div>
+            {wall ? (
+              <div className="sticky top-0 z-10 -mx-4 bg-background lg:static lg:mx-0">
+                <WallViewer
+                  key={wall.id}
+                  wall={wall}
+                  routes={routes}
+                  selectedRouteId={selectedRouteId}
+                  hoveredRouteId={hoveredRouteId}
+                  onSelectRoute={setSelectedRouteId}
+                  onHoverRoute={setHoveredRouteId}
+                  className="transition-[height] duration-200 lg:rounded-[10px]"
+                  style={{ height: viewerHeight }}
+                />
+              </div>
+            ) : (
+              <p className="rounded-[10px] bg-secondary p-4 text-sm text-muted-foreground">Ta skała nie ma jeszcze zdjęć z topo.</p>
+            )}
+            {crag.walls.length > 1 && <WallThumbnails walls={crag.walls} activeId={wall?.id ?? null} onSelect={setWallId} />}
           </div>
-          <p className="rounded-[10px] bg-secondary p-4 text-sm text-muted-foreground">
-            Topo tej skały (zdjęcia ścian z drogami) pojawi się w kolejnym etapie.
-          </p>
-        </>
+          <div className="flex flex-col gap-4">
+            <CragInfo crag={crag} descriptionOpen={isDesktop} />
+            <RouteList
+              rows={rows}
+              wallNames={wallNames}
+              selectedRouteId={selectedRouteId}
+              hoveredRouteId={hoveredRouteId}
+              onChoose={chooseRow}
+              onHover={setHoveredRouteId}
+            />
+            {crag.source === "portalgorski" && crag.source_url && (
+              <p className="text-xs text-muted-foreground">
+                Źródło danych:{" "}
+                <a href={crag.source_url} target="_blank" rel="noreferrer" className="underline">
+                  Portal Górski
+                </a>
+              </p>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
