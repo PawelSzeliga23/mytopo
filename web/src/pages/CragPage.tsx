@@ -6,7 +6,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { CragInfo } from "@/crag/CragInfo";
 import { RouteList } from "@/crag/RouteList";
 import { routeRows, type RouteRow } from "@/crag/topo";
-import { useCompactOnScroll } from "@/crag/useCompactOnScroll";
+import { compactSpacer, phoneViewerHeight, useCompactOnScroll } from "@/crag/useCompactOnScroll";
 import { WallThumbnails, wallLabel } from "@/crag/WallThumbnails";
 import { WallViewer } from "@/crag/WallViewer";
 import { api, ApiError } from "@/lib/api";
@@ -51,7 +51,8 @@ export default function CragPage() {
   }
 
   const aspect = wall?.image_width && wall.image_height ? wall.image_height / wall.image_width : 4 / 3;
-  const viewerHeight = isDesktop ? "calc(100vh - 13rem)" : compact ? "30vh" : `min(${Math.round(aspect * 100)}vw, 65vh)`;
+  const viewerHeight = isDesktop ? "calc(100vh - 13rem)" : phoneViewerHeight(aspect, compact);
+  const spacer = compactSpacer(aspect, compact);
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-10 lg:px-6">
@@ -119,6 +120,7 @@ export default function CragPage() {
               </p>
             )}
           </div>
+          {spacer && <div aria-hidden style={{ height: spacer }} />}
         </div>
       )}
     </div>

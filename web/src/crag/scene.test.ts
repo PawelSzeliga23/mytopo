@@ -38,4 +38,9 @@ describe("buildScene", () => {
     expect(scene.map((line) => [line.lineId, line.emphasis])).toEqual([[2, "dim"], [4, "dim"], [1, "hover"], [3, "selected"]]);
     expect(scene[3].points).toEqual([40, 90, 40, 60, 60, 25]);
   });
+
+  it("wybrana droga bez linii na tym zdjęciu nie przygasza niczego", () => {
+    const scene = buildScene({ ...base, selectedRouteId: 99, hoveredRouteId: null });
+    expect(scene.every((line) => line.emphasis === "normal")).toBe(true);
+  });
 });

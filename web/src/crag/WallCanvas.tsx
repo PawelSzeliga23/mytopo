@@ -2,6 +2,7 @@ import type Konva from "konva";
 import { useRef, useState } from "react";
 import { Circle, Group, Image as KonvaImage, Layer, Line, Rect, RegularPolygon, Stage, Text } from "react-konva";
 import { buildScene, type SceneLine, type SceneMark } from "@/crag/scene";
+import { draggedAfterStart, isDrag } from "@/crag/gesture";
 import { clampView, IDENTITY, panBy, toScreen, zoomAt, type Point, type Size, type View } from "@/crag/view";
 import type { RouteOut, WallOut } from "@/lib/api";
 import { useTheme } from "@/lib/theme";
@@ -21,8 +22,6 @@ const WIDTH = { normal: 3, dim: 2.5, hover: 5, selected: 6 } as const;
 const OPACITY = { normal: 1, dim: 0.35, hover: 1, selected: 1 } as const;
 const HALO = "rgba(0,0,0,0.45)";
 const WHEEL_STEP = 1.2;
-/** Pointer travel (px) after which a gesture counts as a drag, not a click. */
-const DRAG_THRESHOLD = 4;
 
 type KonvaEvent = Konva.KonvaEventObject<MouseEvent | TouchEvent>;
 
@@ -73,8 +72,10 @@ export function WallCanvas({ image, wall, routes, size, selectedRouteId, hovered
 
   function start(points: Point[]) {
     if (points.length === 0) return;
-    gesture.current = { last: center(points), spread: points.length > 1 ? spread(points) : null, travel: 0 };
-    dragged.current = false;
+    // A finger joining or leaving a running gesture continues it; only a fresh gesture resets "dragged" and the travel.
+    const previous = gesture.current;
+    gesture.current = { last: center(points), spread: points.length > 1 ? spread(points) : null, travel: previous?.travel ?? 0 };
+    dragged.current = draggedAfterStart(dragged.current, previous !== null, points.length);
   }
 
   function move(event: KonvaEvent) {
@@ -88,7 +89,7 @@ export function WallCanvas({ image, wall, routes, size, selectedRouteId, hovered
     if (view.zoom > 1 || points.length > 1) event.evt.preventDefault();
     setView((current) => zoomAt(panBy(current, dx, dy, size), mid, ratio, size));
     state.travel += Math.hypot(dx, dy);
-    if (state.travel > DRAG_THRESHOLD) dragged.current = true;
+    if (isDrag(state.travel)) dragged.current = true;
     state.last = mid;
     if (points.length > 1) state.spread = spread(points);
   }
@@ -138,6 +139,9 @@ export function WallCanvas({ image, wall, routes, size, selectedRouteId, hovered
         onTouchStart={(event) => start(pointsOf(event))}
         onTouchMove={move}
         onTouchEnd={end}
+        onTouchCancel={() => {
+          gesture.current = null;
+        }}
         onClick={() => {
           if (!dragged.current) onSelectRoute(null);
         }}

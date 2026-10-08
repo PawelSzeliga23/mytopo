@@ -20,3 +20,15 @@ export function useCompactOnScroll(enabled: boolean): boolean {
   }, [enabled]);
   return enabled && compact;
 }
+
+const COMPACT_HEIGHT = "30vh";
+
+/** Phone photo height (CSS) — full while the page is near the top, a strip once compact. */
+export function phoneViewerHeight(aspect: number, compact: boolean): string {
+  return compact ? COMPACT_HEIGHT : `min(${Math.round(aspect * 100)}vw, 65vh)`;
+}
+
+/** Height the photo loses when compact. Added back as a spacer so the page keeps its length: otherwise a short page clamps scrollY back under the threshold and bounces. */
+export function compactSpacer(aspect: number, compact: boolean): string | null {
+  return compact ? `calc(${phoneViewerHeight(aspect, false)} - ${COMPACT_HEIGHT})` : null;
+}

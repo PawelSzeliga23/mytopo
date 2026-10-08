@@ -38,8 +38,8 @@ function Row({ row, hint, selected, hovered, onChoose, onHover }: { row: RouteRo
         aria-pressed={selected}
         data-hovered={hovered || undefined}
         onClick={() => onChoose(row)}
-        onMouseEnter={() => onHover(route.id)}
-        onMouseLeave={() => onHover(null)}
+        onPointerEnter={(event) => event.pointerType === "mouse" && onHover(route.id)}
+        onPointerLeave={(event) => event.pointerType === "mouse" && onHover(null)}
         className={`flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left ${selected ? "bg-secondary" : hovered ? "bg-secondary/60" : "hover:bg-secondary/60"}`}
       >
         <span

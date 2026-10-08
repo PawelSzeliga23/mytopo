@@ -39,6 +39,8 @@ const PAINT_ORDER = { dim: 0, normal: 1, hover: 2, selected: 3 } as const;
 /** Everything the 2D viewer draws for one photo, in stage pixels and paint order (emphasised lines last, on top). */
 export function buildScene({ wall, routes, image, container, view, theme, selectedRouteId, hoveredRouteId }: SceneArgs): SceneLine[] {
   const lines = new Map(wall.lines.map((line) => [line.id, line]));
+  // Dim the rest only when the selected route is drawn on this photo; otherwise nothing would be emphasised.
+  const selectedHere = selectedRouteId !== null && wall.lines.some((line) => line.route_id === selectedRouteId);
   const screen = (point: Point) => toScreen(point, image, container, view);
   const scene = orderedLines(wall).map(({ line, label }): SceneLine => {
     const sort = line.route_id === null ? null : (routes.get(line.route_id)?.grade_sort ?? null);
@@ -48,7 +50,7 @@ export function buildScene({ wall, routes, image, container, view, theme, select
         ? "selected"
         : line.route_id !== null && line.route_id === hoveredRouteId
           ? "hover"
-          : selectedRouteId !== null
+          : selectedHere
             ? "dim"
             : "normal";
     // Only an emphasised variant repeats its parent's trunk; otherwise the trunk would be overdrawn in several colours.
