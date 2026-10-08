@@ -25,6 +25,7 @@ topo = "topo.cli:app"
 [project.optional-dependencies]
 depth = [
     "torch>=2.4",
+    "torchvision>=0.19",
     "transformers>=4.45",
 ]
 

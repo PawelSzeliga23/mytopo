@@ -33,6 +33,9 @@ class Wall(SourceMixin, Base):
     depth_path: Mapped[str | None] = mapped_column(String(500))
     depth_status: Mapped[str] = mapped_column(String(16), default="pending", server_default="pending")
     depth_model: Mapped[str | None] = mapped_column(String(64))
+    vegetation_ratio: Mapped[float | None]
+    route_vegetation_ratio: Mapped[float | None]
+    depth_enabled: Mapped[bool | None]
 
     crag: Mapped["Crag"] = relationship(back_populates="walls")
     lines: Mapped[list["RouteLine"]] = relationship(

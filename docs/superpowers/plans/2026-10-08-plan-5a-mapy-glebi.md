@@ -1120,3 +1120,24 @@ Na tej podstawie powstaje plan 5b (widok 2.5D w aplikacji: odporny odczyt głęb
 ## Wnioski z wykonania
 
 (uzupełnić po Task 5)
+
+## Zmiana po próbie (decyzja użytkownika, 2026-10-08)
+
+Po obejrzeniu galerii: gałęzie bardzo przeszkadzają, a wycinanie skoków głębi w podglądzie działa „średnio”. Decyzja: **ściany mocno zarośnięte nie dostają 2.5D automatycznie** — rozpoznajemy je modelem segmentacji, a 2.5D można dla nich włączyć ręcznie (w edytorze w planie 7; teraz komenda CLI). Dodatkowo powstał tryb „hologram” w podglądzie (cieniowanie + poziomice) — do oceny razem z resztą.
+
+### Task 6: Maska roślinności i decyzja 2.5D / tylko 2D
+
+- Migracja `0004`: `wall.vegetation_ratio` (float), `wall.route_vegetation_ratio` (float), `wall.depth_enabled` (bool, `NULL` = automatycznie) — także w `wall_version`.
+- `topo.depth`: protokół `VegetationSegmenter.predict(image) -> uint8` (0 = inne, 1 = roślinność, 2 = niebo) w rozmiarze `depth_size`; `vegetation_stats(classes, lines) -> (ratio, route_ratio)`: `ratio` = roślinność / piksele nie-nieba, `route_ratio` = odsetek próbek wzdłuż linii dróg (co ~4 px), w których okno 9×9 jest w ponad połowie roślinnością (`None` bez linii); maska zapisywana jako `walls/{id}/vegetation.png` (L: 0/255 roślinność); `wants_3d(wall)`: ręczne `depth_enabled` wygrywa, inaczej `route_ratio ≤ 0.15` (bez linii: `ratio ≤ 0.30`), zawsze `False` bez gotowej głębi.
+- `process_wall(..., segmenter=None, force=False)` liczy brakującą głębię i brakującą roślinność; `select_walls` wybiera także ściany bez `vegetation_ratio`; zapis jak dotąd `UPDATE` bez historii.
+- `HFVegetationSegmenter` (SegFormer-B5 ADE20K, `nvidia/segformer-b5-finetuned-ade-640-640`; etykiety roślinności: tree, grass, plant, flower, palm), `topo depth` używa go domyślnie.
+- `topo wall-3d ID on|off|auto` — ręczne ustawienie `depth_enabled` (zapis bez historii: to ustawienie wyświetlania).
+- Galeria: kolumna „roślinność” (zdjęcie z zaznaczoną maską), procenty i werdykt „2.5D / tylko 2D”, sortowanie od najbardziej zarośniętych.
+- Potem: przeliczenie roślinności dla 251 ścian z próby, galeria, ocena progu z użytkownikiem.
+
+**Doprecyzowanie użytkownika (w trakcie Task 6) — obowiązuje zamiast punktów wyżej, gdzie się różni:**
+- Liczy się **roślinność nachodząca na skałę**, nie ta w tle. `rock_region`: w każdej kolumnie od najwyższego piksela skały do podłoża pod najniższym pikselem skały. `wall.vegetation_ratio` = udział roślinności w tym obszarze (bez nieba); bez rozpoznanej skały — udział roślinności na zdjęciu bez nieba. `route_vegetation_ratio` tylko informacyjnie.
+- Próg: `vegetation_ratio ≤ 0.10` → 2.5D, powyżej → tylko 2D (ręczne `depth_enabled` wygrywa).
+- Klasy segmentacji: 0 inne, 1 roślinność (tree, plant, flower, palm), 2 niebo, 3 skała (rock, mountain, hill, wall), 4 podłoże (grass, earth, floor, road, sidewalk, field, sand, path, dirt track, land, step, stairs, stairway); zapis `walls/{id}/segments.png`.
+- Podgląd: niebo i tło usunięte (rysowane tylko trójkąty skały i podłoża), hologram przygaszony — skała jasnoniebieska, podłoże szare; wycinanie skoków domyślnie wyłączone.
+- Dodatek `depth` wymaga też `torchvision` (procesor obrazów SegFormera w transformers 5).

@@ -9,7 +9,8 @@
 <label><input type="radio" name="mode" value="holo" checked> hologram</label>
 <label><input type="radio" name="mode" value="photo"> zdjęcie</label><br>
 <label>głębia <input id="scale" type="range" min="0" max="0.6" step="0.01" value="0.25"></label><br>
-<label>wycinanie skoków <input id="cut" type="range" min="0.005" max="0.3" step="0.005" value="0.04"></label>
+<label><input id="background" type="checkbox" checked> usuń niebo i tło</label><br>
+<label>wycinanie skoków <input id="cut" type="range" min="0.005" max="0.3" step="0.005" value="0.3"></label>
 <span id="cutValue"></span><br>
 <label><input id="contours" type="checkbox" checked> poziomice</label>
 <label><input id="routes" type="checkbox" checked> drogi</label>
@@ -38,6 +39,18 @@ const depth = new Float32Array(W * H);
 for (let i = 0; i < W * H; i++) depth[i] = (rgba[4 * i] * 256 + rgba[4 * i + 1]) / 65535;
 const lines = await (await fetch(`${id}-linie.json`)).json();
 
+// Classes per pixel: 0 other, 1 vegetation, 2 sky, 3 rock, 4 ground (missing file = everything is rock).
+const ROCK = 3, GROUND = 4;
+const classes = new Uint8Array(W * H).fill(ROCK);
+const classResponse = await fetch(`${id}-klasy.png`);
+if (classResponse.ok) {
+  const classBitmap = await createImageBitmap(await classResponse.blob(), { colorSpaceConversion: "none", premultiplyAlpha: "none" });
+  const classCtx = new OffscreenCanvas(W, H).getContext("2d", { willReadFrequently: true });
+  classCtx.drawImage(classBitmap, 0, 0, W, H);
+  const classPixels = classCtx.getImageData(0, 0, W, H).data;
+  for (let i = 0; i < W * H; i++) classes[i] = classPixels[4 * i];
+}
+
 const aspect = W / H;
 const width = aspect >= 1 ? 1.6 : 1.6 * aspect;
 const height = width / aspect;
@@ -58,10 +71,13 @@ const count = (GX + 1) * (GY + 1);
 const positions = new Float32Array(count * 3);
 const uvs = new Float32Array(count * 2);
 const nodeDepth = new Float32Array(count);
+const nodeClass = new Float32Array(count);
 for (let j = 0; j <= GY; j++) {
   for (let i = 0; i <= GX; i++) {
     const k = j * (GX + 1) + i, u = i / GX, v = j / GY;
-    nodeDepth[k] = depth[Math.round(v * (H - 1)) * W + Math.round(u * (W - 1))];
+    const pixel = Math.round(v * (H - 1)) * W + Math.round(u * (W - 1));
+    nodeDepth[k] = depth[pixel];
+    nodeClass[k] = classes[pixel];
     positions[3 * k] = (u - 0.5) * width;
     positions[3 * k + 1] = (0.5 - v) * height;
     uvs[2 * k] = u;
@@ -72,11 +88,15 @@ const geometry = new THREE.BufferGeometry();
 geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
 geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
 geometry.setAttribute("depth", new THREE.BufferAttribute(nodeDepth, 1));
+geometry.setAttribute("cls", new THREE.BufferAttribute(nodeClass, 1));
 
 // Triangles whose corners differ in depth by more than `cut` (fraction of the depth range) are not drawn.
-function buildIndex(cut) {
+// With `onlyRock`, triangles touching sky, vegetation or other background are not drawn either.
+function buildIndex(cut, onlyRock) {
   const index = [];
+  const solid = (k) => nodeClass[k] === ROCK || nodeClass[k] === GROUND;
   const keep = (a, b, c) =>
+    (!onlyRock || (solid(a) && solid(b) && solid(c))) &&
     Math.max(nodeDepth[a], nodeDepth[b], nodeDepth[c]) - Math.min(nodeDepth[a], nodeDepth[b], nodeDepth[c]) <= cut;
   for (let j = 0; j < GY; j++) {
     for (let i = 0; i < GX; i++) {
@@ -95,16 +115,17 @@ const holoMaterial = new THREE.ShaderMaterial({
   side: THREE.DoubleSide,
   uniforms: { contours: { value: 1 }, levels: { value: 40 } },
   vertexShader: `
-    attribute float depth;
-    varying vec3 vNormal; varying vec3 vView; varying float vDepth;
+    attribute float depth; attribute float cls;
+    varying vec3 vNormal; varying vec3 vView; varying float vDepth; varying float vGround;
     void main() {
       vec4 mv = modelViewMatrix * vec4(position, 1.0);
       vNormal = normalize(normalMatrix * normal); vView = -mv.xyz; vDepth = depth;
+      vGround = cls > 3.5 ? 1.0 : 0.0;
       gl_Position = projectionMatrix * mv;
     }`,
   fragmentShader: `
     uniform float contours; uniform float levels;
-    varying vec3 vNormal; varying vec3 vView; varying float vDepth;
+    varying vec3 vNormal; varying vec3 vView; varying float vDepth; varying float vGround;
     void main() {
       vec3 n = normalize(vNormal);
       if (!gl_FrontFacing) n = -n;
@@ -112,8 +133,10 @@ const holoMaterial = new THREE.ShaderMaterial({
       float rim = pow(1.0 - abs(dot(n, normalize(vView))), 2.0);
       float d = vDepth * levels;
       float line = (1.0 - min(abs(fract(d - 0.5) - 0.5) / fwidth(d), 1.0)) * contours;
-      vec3 color = mix(vec3(0.01, 0.07, 0.10), vec3(0.15, 0.75, 0.95), light)
-        + line * vec3(0.45, 0.95, 1.0) * 0.7 + rim * vec3(0.1, 0.55, 0.9) * 0.5;
+      // Rock: soft light blue; ground: neutral grey. Muted on purpose — the routes are the bright elements.
+      vec3 shadow = mix(vec3(0.10, 0.14, 0.18), vec3(0.16, 0.16, 0.16), vGround);
+      vec3 lit = mix(vec3(0.62, 0.76, 0.86), vec3(0.58, 0.58, 0.58), vGround);
+      vec3 color = mix(shadow, lit, light) + line * vec3(0.85, 0.93, 1.0) * 0.18 + rim * vec3(0.5, 0.65, 0.8) * 0.12;
       gl_FragColor = vec4(color, 1.0);
     }`,
 });
@@ -173,7 +196,7 @@ function applyScale() {
 function applyCut() {
   const cut = Number($("#cut").value);
   $("#cutValue").textContent = cut >= 0.3 ? "(wyłączone)" : `(${(cut * 100).toFixed(1)}% zakresu)`;
-  buildIndex(cut >= 0.3 ? Infinity : cut);
+  buildIndex(cut >= 0.3 ? Infinity : cut, $("#background").checked);
   geometry.computeVertexNormals();
 }
 function applyMode() {
@@ -182,6 +205,7 @@ function applyMode() {
 }
 $("#scale").addEventListener("input", applyScale);
 $("#cut").addEventListener("input", applyCut);
+$("#background").addEventListener("change", applyCut);
 for (const radio of document.querySelectorAll("input[name=mode]")) radio.addEventListener("change", applyMode);
 $("#wire").addEventListener("change", applyMode);
 $("#contours").addEventListener("change", (e) => { holoMaterial.uniforms.contours.value = e.target.checked ? 1 : 0; });

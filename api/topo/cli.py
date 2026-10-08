@@ -5,7 +5,17 @@ import typer
 
 from topo.config import get_settings
 from topo.db import SessionLocal
-from topo.depth import MODELS, DepthReport, HFDepthEstimator, model_name, run_depth, select_walls
+from topo.depth import (
+    MODELS,
+    DepthReport,
+    HFDepthEstimator,
+    HFSegmenter,
+    model_name,
+    run_depth,
+    select_walls,
+    set_wall_fields,
+    wants_3d,
+)
 from topo.depth_preview import ready_walls, write_gallery
 from topo.importer.fetch import CachedFetcher, FetchError
 from topo.importer.portalgorski.store import ImportReport
@@ -82,7 +92,7 @@ def depth_command(
     only_model: str | None = typer.Option(None, "--only-model", help="Przelicz ściany zrobione tym modelem (large/small)"),
     force: bool = typer.Option(False, "--force", help="Licz od nowa także gotowe"),
 ) -> None:
-    """Liczy mapy głębi zdjęć ścian (Depth Anything V2)."""
+    """Liczy mapy głębi (Depth Anything V2) i segmentację (skała, podłoże, roślinność, niebo) zdjęć ścian."""
     for key in (model, only_model):
         if key is not None and key not in MODELS:
             raise typer.BadParameter(f"Nieznany model {key!r} — dostępne: {', '.join(MODELS)}")
@@ -92,16 +102,20 @@ def depth_command(
     with SessionLocal() as session:
         walls = select_walls(
             session, wall_ids=wall_ids or None, crag_limit=crags,
-            only_model=model_name(only_model) if only_model else None, force=force,
+            only_model=model_name(only_model) if only_model else None, force=force, with_segments=True,
         )
         if not walls:
             typer.echo("Nic do przeliczenia.")
             return
         typer.echo(f"Ścian do przeliczenia: {len(walls)}. Wczytuję model {model}…")
         estimator = HFDepthEstimator(model)
-        typer.echo(f"Model {estimator.name} na {estimator.device}.")
+        segmenter = HFSegmenter(estimator.device)
+        typer.echo(f"Model {estimator.name} i segmentacja na {estimator.device}.")
         try:
-            report = run_depth(session, walls, Path(settings.media_root), estimator, log=typer.echo)
+            report = run_depth(
+                session, walls, Path(settings.media_root), estimator, log=typer.echo, segmenter=segmenter,
+                force=force or only_model is not None,
+            )
         except KeyboardInterrupt:
             typer.echo("Przerwano — gotowe mapy głębi zostają, ponowne uruchomienie dokończy resztę.")
             raise typer.Exit(130)
@@ -128,3 +142,20 @@ def depth_preview_command(
             return
         index = write_gallery(walls, Path(settings.media_root), output)
     typer.echo(f"Galeria: {len(walls)} ścian, {index}")
+
+
+@app.command("wall-3d")
+def wall_3d_command(
+    wall_id: int,
+    mode: str = typer.Argument(..., help="on (zawsze 2.5D), off (tylko 2D) albo auto (według roślinności)"),
+) -> None:
+    """Ręcznie włącza albo wyłącza widok 2.5D ściany."""
+    values = {"on": True, "off": False, "auto": None}
+    if mode not in values:
+        raise typer.BadParameter("Tryb: on, off albo auto")
+    with SessionLocal() as session:
+        wall = session.get(Wall, wall_id)
+        if wall is None:
+            raise typer.BadParameter("Nie ma takiej ściany")
+        set_wall_fields(session, wall, depth_enabled=values[mode])
+        typer.echo(f"Ściana #{wall.id}: {'2.5D' if wants_3d(wall) else 'tylko 2D'} (ustawienie: {mode}).")

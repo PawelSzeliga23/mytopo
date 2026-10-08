@@ -27,7 +27,7 @@ def test_hillshade_flat_is_uniform_and_slopes_differ():
 
 
 def _ready_wall(session, media_root, crag_name="Skała <Test>"):
-    wall = f.wall(session, f.crag(session, f.area(session, "R"), crag_name), name="Płn.")
+    wall = f.wall(session, f.crag(session, f.area(session, f"R {crag_name}"), crag_name), name="Płn.")
     folder = media_root / "walls" / str(wall.id)
     folder.mkdir(parents=True)
     Image.new("RGB", (160, 120), (90, 90, 90)).save(folder / "display.webp")
@@ -64,3 +64,18 @@ def test_write_gallery_creates_files_and_escaped_index(session, tmp_path):
         "color": wall.lines[0].color,
         "points": [[0.5, 0.9, "start", False], [0.5, 0.5, "ring", True], [0.5, 0.1, "stanowisko", True]],
     }]
+
+
+def test_gallery_shows_segments_and_verdict_sorted_by_overgrowth(session, tmp_path):
+    media = tmp_path / "media"
+    clean = _ready_wall(session, media, crag_name="Czysta")
+    overgrown = _ready_wall(session, media, crag_name="Zarośnięta")
+    clean.vegetation_ratio, overgrown.vegetation_ratio = 0.05, 0.4
+    Image.fromarray(np.full((120, 160), 3, dtype=np.uint8)).save(media / "walls" / str(overgrown.id) / "segments.png")
+    session.flush()
+    html = write_gallery([clean, overgrown], media, tmp_path / "out").read_text(encoding="utf-8")
+    assert html.index("Zarośnięta") < html.index("Czysta")
+    assert "roślinność na skale 40%" in html and "tylko 2D" in html and "2.5D</b>" in html
+    assert (tmp_path / "out" / f"{overgrown.id}-klasy.jpg").exists()
+    assert (tmp_path / "out" / f"{overgrown.id}-klasy.png").exists()
+    assert not (tmp_path / "out" / f"{clean.id}-klasy.jpg").exists()

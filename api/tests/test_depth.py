@@ -8,6 +8,10 @@ from sqlalchemy_continuum import version_class
 from tests import factories as f
 from topo.depth import (
     DEPTH_MAX,
+    GROUND,
+    ROCK,
+    SKY,
+    VEGETATION,
     compute_depth,
     depth_size,
     load_depth,
@@ -16,6 +20,8 @@ from topo.depth import (
     run_depth,
     save_depth_png,
     select_walls,
+    vegetation_stats,
+    wants_3d,
 )
 from topo.models import Wall
 
@@ -163,3 +169,93 @@ def test_run_marks_missing_photo_failed(session, tmp_path):
     (tmp_path / walls[0].image_path).unlink()
     report = run_depth(session, walls[:1], tmp_path, FakeEstimator(), log=lambda _: None)
     assert report.done == 0 and walls[0].depth_status == "failed"
+
+
+class FakeSegmenter:
+    """Left quarter sky, second quarter vegetation, third rock, right quarter ground (at its own half resolution)."""
+
+    def predict(self, image):
+        width, height = image.width // 2, image.height // 2
+        classes = np.full((height, width), GROUND, dtype=np.uint8)
+        quarter = width // 4
+        classes[:, :quarter], classes[:, quarter:2 * quarter], classes[:, 2 * quarter:3 * quarter] = SKY, VEGETATION, ROCK
+        return classes
+
+
+def test_vegetation_stats_counts_only_vegetation_over_the_rock():
+    classes = np.full((40, 40), ROCK, dtype=np.uint8)
+    classes[:5, :] = SKY
+    classes[:5, 30:] = VEGETATION     # tree above the rock, in the background
+    classes[30:, :] = GROUND
+    classes[20:30, :10] = VEGETATION  # bush in front of the base of the rock
+    ratio, route_ratio = vegetation_stats(classes, [])
+    assert ratio == 100 / 1000
+    assert route_ratio is None
+
+
+def test_vegetation_beside_the_rock_does_not_count_but_routes_through_it_do():
+    classes = np.full((40, 40), ROCK, dtype=np.uint8)
+    classes[:, :20] = VEGETATION
+    ratio, route_ratio = vegetation_stats(classes, [[(0.25, 0.1), (0.25, 0.9)], [(0.8, 0.1), (0.8, 0.9)]])
+    assert ratio == 0.0
+    assert route_ratio == 0.5
+
+
+def test_vegetation_stats_without_routes():
+    ratio, route_ratio = vegetation_stats(np.full((10, 10), VEGETATION, dtype=np.uint8), [])
+    assert (ratio, route_ratio) == (1.0, None)
+
+
+def test_vegetation_stats_clamps_points_outside_photo():
+    _, route_ratio = vegetation_stats(np.full((10, 10), ROCK, dtype=np.uint8), [[(-0.2, 1.3), (1.4, -0.1)]])
+    assert route_ratio == 0.0
+
+
+def test_wants_3d(session):
+    wall = Wall(depth_status="ready", vegetation_ratio=0.08, route_vegetation_ratio=0.9)
+    assert wants_3d(wall)
+    wall.vegetation_ratio = 0.25
+    assert not wants_3d(wall)
+    wall.depth_enabled = True
+    assert wants_3d(wall)
+    assert not wants_3d(Wall(depth_status="ready", vegetation_ratio=0.0, depth_enabled=False))
+    assert not wants_3d(Wall(depth_status="pending", depth_enabled=True))
+    assert wants_3d(Wall(depth_status="ready"))
+
+
+def test_process_wall_with_segmenter_saves_classes_and_ratios(session, tmp_path):
+    walls, _ = _walls(session, tmp_path)
+    wall = walls[0]
+    f.line(session, wall, points=((0.6, 0.9, "start"), (0.6, 0.1, "stanowisko")))
+    process_wall(session, wall, tmp_path, FakeEstimator(), FakeSegmenter())
+    with Image.open(tmp_path / "walls" / str(wall.id) / "segments.png") as segments:
+        classes = np.asarray(segments)
+    assert classes.shape == (48, 64) and set(np.unique(classes)) == {SKY, VEGETATION, ROCK, GROUND}
+    assert wall.vegetation_ratio == 0.0  # vegetation beside the rock only
+    assert wall.route_vegetation_ratio == 0.0
+    assert wall.depth_status == "ready"
+
+
+def test_process_wall_only_adds_missing_segments(session, tmp_path):
+    walls, _ = _walls(session, tmp_path)
+    wall = walls[0]
+    process_wall(session, wall, tmp_path, FakeEstimator())
+    depth_file = tmp_path / wall.depth_path
+    depth_file.write_bytes(b"stara")
+
+    class NoDepth(FakeEstimator):
+        def predict(self, image):
+            raise AssertionError("depth should not be recomputed")
+
+    process_wall(session, wall, tmp_path, NoDepth(), FakeSegmenter())
+    assert wall.vegetation_ratio is not None and depth_file.read_bytes() == b"stara"
+
+
+def test_select_with_segments_picks_ready_walls_without_segmentation(session, tmp_path):
+    walls, _ = _walls(session, tmp_path)
+    for wall in walls:
+        wall.depth_status = "ready"
+    walls[0].vegetation_ratio = 0.1
+    session.flush()
+    assert select_walls(session) == []
+    assert select_walls(session, with_segments=True) == walls[1:]

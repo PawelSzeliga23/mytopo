@@ -1,4 +1,4 @@
-"""Static gallery for judging depth maps: photo with lines, coloured depth, relief shading and a 2.5D viewer."""
+"""Static gallery for judging depth maps: photo with lines, segmentation, coloured depth, relief shading, 2.5D viewer."""
 
 import html
 import json
@@ -10,7 +10,7 @@ from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from topo.depth import load_depth
+from topo.depth import GROUND, ROCK, SEGMENTS_FILE, SKY, VEGETATION, VEGETATION_LIMIT, load_depth, wants_3d
 from topo.importer.preview import render_wall_preview
 from topo.models import Wall
 
@@ -72,31 +72,70 @@ def _lines(wall: Wall) -> list[dict]:
     ]
 
 
+SEGMENT_COLORS = {ROCK: (120, 180, 235), GROUND: (150, 150, 150), VEGETATION: (40, 200, 60), SKY: (255, 255, 255)}
+
+
+def segments_overlay(photo: Image.Image, classes: np.ndarray) -> Image.Image:
+    """Photo tinted by class: rock light blue, ground grey, vegetation green, sky white, other untouched."""
+    base = np.asarray(photo.convert("RGB").resize((classes.shape[1], classes.shape[0])), dtype=np.float64)
+    tint = base.copy()
+    for value, color in SEGMENT_COLORS.items():
+        tint[classes == value] = color
+    return Image.fromarray(np.round(base * 0.45 + tint * 0.55).astype(np.uint8), "RGB")
+
+
+def _percent(value: float | None) -> str:
+    return "—" if value is None else f"{value * 100:.0f}%"
+
+
+def _overgrowth(wall: Wall) -> float:
+    return wall.vegetation_ratio or 0.0
+
+
 def write_gallery(walls: list[Wall], media_root: Path, out_dir: Path) -> Path:
+    """Walls sorted from the most overgrown; each with its 2.5D / 2D-only verdict."""
     out_dir.mkdir(parents=True, exist_ok=True)
     sections = []
-    for wall in walls:
+    for wall in sorted(walls, key=_overgrowth, reverse=True):
         depth = load_depth(Path(media_root) / wall.depth_path)
+        with Image.open(Path(media_root) / wall.image_path) as opened:
+            photo = opened.convert("RGB")
+        photo.save(out_dir / f"{wall.id}-zdjecie.jpg", quality=88)
         _small(render_wall_preview(wall, media_root)).save(out_dir / f"{wall.id}-linie.jpg", quality=85)
         colorize(depth).save(out_dir / f"{wall.id}-glebia.jpg", quality=85)
         hillshade(depth).save(out_dir / f"{wall.id}-cien.jpg", quality=85)
         _depth_rgb(depth).save(out_dir / f"{wall.id}-glebia16.png")
         (out_dir / f"{wall.id}-linie.json").write_text(json.dumps(_lines(wall)), encoding="utf-8")
-        with Image.open(Path(media_root) / wall.image_path) as photo:
-            photo.convert("RGB").save(out_dir / f"{wall.id}-zdjecie.jpg", quality=88)
+        columns = [("linie", "zdjęcie z liniami")]
+        segments_path = Path(media_root) / "walls" / str(wall.id) / SEGMENTS_FILE
+        if segments_path.exists():
+            with Image.open(segments_path) as segments:
+                classes = np.asarray(segments)
+            segments_overlay(photo, classes).save(out_dir / f"{wall.id}-klasy.jpg", quality=85)
+            shutil.copyfile(segments_path, out_dir / f"{wall.id}-klasy.png")
+            columns.append(("klasy", "skała, podłoże, roślinność"))
+        columns += [("glebia", "głębia"), ("cien", "cieniowanie")]
         title = html.escape(f"{wall.crag.name} — {wall.name or 'ściana'}")
         view = html.escape(f"view.html#id={wall.id}&w={depth.shape[1]}&h={depth.shape[0]}")
+        verdict = "2.5D" if wants_3d(wall) else "tylko 2D"
+        stats = (
+            f"roślinność na skale {_percent(wall.vegetation_ratio)} · "
+            f"na drogach {_percent(wall.route_vegetation_ratio)} → <b class=\"v{int(wants_3d(wall))}\">{verdict}</b>"
+        )
         images = "".join(
             f'<a href="{wall.id}-{name}.jpg"><img src="{wall.id}-{name}.jpg" alt="{label}" loading="lazy"></a>'
-            for name, label in (("linie", "zdjęcie z liniami"), ("glebia", "głębia"), ("cien", "cieniowanie"))
+            for name, label in columns
         )
         sections.append(
-            f'<section><h2>{title} <small>#{wall.id} · {html.escape(wall.depth_model or "")}</small> '
-            f'<a href="{view}">podgląd 2.5D</a></h2><div class="row">{images}</div></section>'
+            f'<section><h2>{title} <small>#{wall.id} · {stats}</small> '
+            f'<a href="{view}">podgląd 2.5D</a></h2><div class="row c{len(columns)}">{images}</div></section>'
         )
     index = out_dir / "index.html"
     index.write_text(
-        _INDEX.replace("{count}", str(len(walls))).replace("{sections}", "\n".join(sections)), encoding="utf-8"
+        _INDEX.replace("{count}", str(len(walls)))
+        .replace("{limit}", _percent(VEGETATION_LIMIT))
+        .replace("{sections}", "\n".join(sections)),
+        encoding="utf-8",
     )
     shutil.copyfile(Path(__file__).with_name("depth_preview_view.html"), out_dir / "view.html")
     return index
@@ -108,12 +147,14 @@ _INDEX = """<!doctype html>
 <style>
 body{margin:0 auto;max-width:1500px;padding:16px;font:14px system-ui,sans-serif;background:#f4ecdd;color:#2b2420}
 h1{font-size:20px}h2{font-size:15px;margin:24px 0 6px}small{color:#7a6e62;font-weight:400}
-.row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.row img{width:100%;display:block}
-a{color:#2f4fa0}
+.row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.row.c4{grid-template-columns:repeat(4,1fr)}
+.row img{width:100%;display:block}a{color:#2f4fa0}.v0{color:#b23a2b}.v1{color:#2f7a3a}
 </style></head><body>
 <h1>Mapy głębi — {count} ścian</h1>
-<p>Kolumny: zdjęcie z liniami · głębia (czerwone = blisko, granatowe = daleko) · cieniowanie rzeźby (światło z lewej góry).
-Podgląd 2.5D wymaga serwera: <code>npx --yes serve cache/glebia</code>.</p>
+<p>Od najbardziej zarośniętych. Kolumny: zdjęcie z liniami · segmentacja (niebieskie = skała, szare = podłoże,
+zielone = roślinność, białe = niebo) · głębia (czerwone = blisko) · cieniowanie rzeźby.
+Tylko 2D, gdy roślinność zasłania więcej niż {limit} skały (obszar skały: w każdej kolumnie od jej szczytu do podłoża); ręcznie:
+<code>topo wall-3d ID on|off|auto</code>. Podgląd 2.5D wymaga serwera: <code>npx --yes serve cache/glebia</code>.</p>
 {sections}
 </body></html>
 """

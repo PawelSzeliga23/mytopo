@@ -67,10 +67,19 @@ class FakeDepthEstimator:
         return np.asarray(image, dtype=np.float32)[:, :, 0]
 
 
+class FakeSegmenter:
+    def __init__(self, device=None):
+        pass
+
+    def predict(self, image):
+        return np.full((image.height, image.width), 3, dtype=np.uint8)
+
+
 def _depth_setup(session, tmp_path, monkeypatch, crags=("Pierwsza", "Druga")):
     monkeypatch.setattr("topo.cli.SessionLocal", lambda: nullcontext(session))
     monkeypatch.setattr("topo.cli.get_settings", lambda: Settings(media_root=str(tmp_path), cache_dir=str(tmp_path)))
     monkeypatch.setattr("topo.cli.HFDepthEstimator", FakeDepthEstimator)
+    monkeypatch.setattr("topo.cli.HFSegmenter", FakeSegmenter)
     region = f.area(session, "R")
     walls = []
     for name in crags:
@@ -106,7 +115,7 @@ def test_depth_command_crags_limit(session, tmp_path, monkeypatch):
 def test_depth_command_nothing_to_do(session, tmp_path, monkeypatch):
     walls = _depth_setup(session, tmp_path, monkeypatch)
     for wall in walls:
-        wall.depth_status = "ready"
+        wall.depth_status, wall.vegetation_ratio = "ready", 0.0
     session.flush()
     result = CliRunner().invoke(app, ["depth", "--all"])
     assert result.exit_code == 0
@@ -134,3 +143,23 @@ def test_depth_command_interrupt(session, tmp_path, monkeypatch):
 def test_cli_help_lists_depth_commands():
     result = CliRunner().invoke(app, ["--help"])
     assert "depth" in result.output and "depth-preview" in result.output
+
+
+def test_depth_command_also_segments(session, tmp_path, monkeypatch):
+    walls = _depth_setup(session, tmp_path, monkeypatch)
+    result = CliRunner().invoke(app, ["depth", "--all"])
+    assert result.exit_code == 0, result.output
+    assert all(w.vegetation_ratio == 0.0 for w in walls)
+
+
+def test_wall_3d_command(session, tmp_path, monkeypatch):
+    walls = _depth_setup(session, tmp_path, monkeypatch)
+    wall = walls[0]
+    wall.depth_status, wall.vegetation_ratio = "ready", 0.5
+    session.flush()
+    result = CliRunner().invoke(app, ["wall-3d", str(wall.id), "on"])
+    assert result.exit_code == 0, result.output
+    assert wall.depth_enabled is True and "2.5D" in result.output
+    result = CliRunner().invoke(app, ["wall-3d", str(wall.id), "auto"])
+    assert wall.depth_enabled is None and "tylko 2D" in result.output
+    assert CliRunner().invoke(app, ["wall-3d", str(wall.id), "maybe"]).exit_code != 0
