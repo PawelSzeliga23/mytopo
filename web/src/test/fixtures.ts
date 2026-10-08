@@ -15,7 +15,8 @@ export function makeWall(id: number, lines: LineOut[], extra: Partial<WallOut> =
   return {
     id, name: null, description: null, sort_order: 0, version: 1,
     image_url: `/media/walls/${id}/display.webp`, thumb_url: `/media/walls/${id}/thumb.webp`,
-    image_width: 100, image_height: 100, depth_url: null, depth_status: "pending", depth_model: null, lines, ...extra,
+    image_width: 100, image_height: 100, depth_url: null, depth_status: "pending", depth_model: null,
+    segments_url: null, show_3d: false, vegetation_ratio: null, lines, ...extra,
   };
 }
 

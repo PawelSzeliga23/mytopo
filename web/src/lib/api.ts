@@ -81,6 +81,11 @@ export interface WallOut {
   depth_url: string | null;
   depth_status: string;
   depth_model: string | null;
+  /** Segmentation (rock / ground / vegetation / sky) — only with a ready depth map. */
+  segments_url: string | null;
+  /** Show 2.5D by default: depth ready and the rock not overgrown (or switched on by hand). */
+  show_3d: boolean;
+  vegetation_ratio: number | null;
   lines: LineOut[];
 }
 
