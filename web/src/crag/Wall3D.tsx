@@ -39,6 +39,8 @@ const OPACITY = { normal: 1, dim: 0.35, hover: 1, selected: 1 } as const;
 const UNIT = 1000;
 /** A click that moved the pointer further than this (px) was a rotation, not a choice. */
 const CLICK_SLOP = 5;
+/** Extra distance from the rock per paint layer (fraction of the model width): overlapping lines never z-fight. */
+const LAYER_LIFT = 0.0015;
 
 async function fetchBuffer(url: string): Promise<ArrayBuffer> {
   const response = await fetch(url);
@@ -142,8 +144,9 @@ function FitCamera({ surface }: { surface: Surface }) {
 }
 
 /** A route number as a sprite drawn on a small canvas: always faces the camera and keeps its size on screen. */
-function RouteNumber({ position, text, fill, textColor, opacity, handlers }: {
+function RouteNumber({ position, layer, text, fill, textColor, opacity, handlers }: {
   position: [number, number, number];
+  layer: number;
   text: string;
   fill: string;
   textColor: string;
@@ -178,7 +181,7 @@ function RouteNumber({ position, text, fill, textColor, opacity, handlers }: {
   const fov = (camera as THREE.PerspectiveCamera).fov;
   const scale = (22 * 2 * Math.tan(THREE.MathUtils.degToRad(fov / 2))) / Math.max(1, size.height);
   return (
-    <sprite position={position} scale={[scale, scale, 1]} renderOrder={10} {...handlers}>
+    <sprite position={position} scale={[scale, scale, 1]} renderOrder={10 + layer} {...handlers}>
       <spriteMaterial map={texture} sizeAttenuation={false} depthTest={false} transparent opacity={opacity} />
     </sprite>
   );
@@ -199,7 +202,8 @@ function RouteLines({ items, surface, relief, onChoose, onHoverRoute }: {
   return (
     <>
       {items.map((item) => {
-        const flat = linePoints3D(unit(item.points), surface, relief);
+        const lift = LAYER_LIFT * item.layer;
+        const flat = linePoints3D(unit(item.points), surface, relief, 2, 0.004 + lift);
         if (flat.length < 6) return null;
         const points: [number, number, number][] = [];
         for (let i = 0; i < flat.length; i += 3) points.push([flat[i], flat[i + 1], flat[i + 2]]);
@@ -213,18 +217,19 @@ function RouteLines({ items, surface, relief, onChoose, onHoverRoute }: {
         };
         return (
           <group key={item.lineId}>
-            <Line points={points} color={item.color} lineWidth={WIDTH[item.emphasis]} transparent opacity={OPACITY[item.emphasis]} />
+            <Line points={points} color={item.color} lineWidth={WIDTH[item.emphasis]} transparent opacity={OPACITY[item.emphasis]} renderOrder={item.layer} />
             {/* Invisible wide copy: a 3 px line is too hard to hit. */}
             <Line points={points} color={item.color} lineWidth={18} transparent opacity={0} depthWrite={false} {...handlers} />
             {item.marks.map((mark, index) => (
-              <mesh key={index} position={pointOnSurface({ x: mark.x / UNIT, y: mark.y / UNIT }, surface, relief)}>
+              <mesh key={index} renderOrder={item.layer} position={pointOnSurface({ x: mark.x / UNIT, y: mark.y / UNIT }, surface, relief, 0.006 + lift)}>
                 <sphereGeometry args={[mark.kind === "stanowisko" ? 0.009 : 0.006, 12, 8]} />
                 <meshBasicMaterial color={mark.kind === "stanowisko" ? item.color : "#ffffff"} transparent opacity={OPACITY[item.emphasis]} />
               </mesh>
             ))}
             {item.label && (
               <RouteNumber
-                position={pointOnSurface({ x: item.label.x / UNIT, y: item.label.y / UNIT }, surface, relief, 0.012)}
+                position={pointOnSurface({ x: item.label.x / UNIT, y: item.label.y / UNIT }, surface, relief, 0.012 + lift)}
+                layer={item.layer}
                 text={item.label.text}
                 fill={item.label.fill}
                 textColor={item.label.textColor}

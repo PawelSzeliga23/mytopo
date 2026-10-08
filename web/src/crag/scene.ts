@@ -1,7 +1,7 @@
 import { labelTextColor, linePath, orderedLines } from "@/crag/topo";
 import { toScreen, type Point, type Size, type View } from "@/crag/view";
 import type { PointKind, RouteOut, WallOut } from "@/lib/api";
-import { bandColor } from "@/lib/grades";
+import { bandColor, gradeBand } from "@/lib/grades";
 import type { Theme } from "@/lib/theme";
 
 export interface SceneMark {
@@ -19,6 +19,8 @@ export interface SceneLine {
   emphasis: "normal" | "dim" | "hover" | "selected";
   marks: SceneMark[];
   label: { x: number; y: number; text: string; fill: string; textColor: string } | null;
+  /** Paint order, higher on top: see {@link lineLayer}. */
+  layer: number;
 }
 
 interface SceneArgs {
@@ -34,9 +36,22 @@ interface SceneArgs {
 
 /** A variant's number sits beside its branch point (a bolt of the parent line), not on top of it. */
 const VARIANT_LABEL_OFFSET = 16;
-const PAINT_ORDER = { dim: 0, normal: 1, hover: 2, selected: 3 } as const;
+/** Layers above every grade band: the hovered route, then the selected one. */
+const HOVER_LAYER = 5;
+const SELECTED_LAYER = 6;
 
-/** Everything the 2D viewer draws for one photo, in stage pixels and paint order (emphasised lines last, on top). */
+/**
+ * Where overlapping lines meet, a fixed order instead of flicker: easier bands above harder ones
+ * (light blue 4 › dark blue 3 › red 2 › black 1), ungraded routes lowest (0); hovered and selected on top.
+ */
+export function lineLayer(sort: number | null, emphasis: SceneLine["emphasis"]): number {
+  if (emphasis === "selected") return SELECTED_LAYER;
+  if (emphasis === "hover") return HOVER_LAYER;
+  const band = gradeBand(sort);
+  return band === null ? 0 : 4 - band;
+}
+
+/** Everything the viewers draw for one photo, in stage pixels and paint order (see {@link lineLayer}). */
 export function buildScene({ wall, routes, image, container, view, theme, selectedRouteId, hoveredRouteId }: SceneArgs): SceneLine[] {
   const lines = new Map(wall.lines.map((line) => [line.id, line]));
   // Dim the rest only when the selected route is drawn on this photo; otherwise nothing would be emphasised.
@@ -69,7 +84,8 @@ export function buildScene({ wall, routes, image, container, view, theme, select
       emphasis,
       marks: line.points.filter((point) => point.visible).map((point) => ({ ...screen(point), kind: point.kind })),
       label: at ? { x: at.x + offset, y: at.y, text: label, fill: color, textColor: labelTextColor(sort, theme) } : null,
+      layer: lineLayer(sort, emphasis),
     };
   });
-  return scene.sort((a, b) => PAINT_ORDER[a.emphasis] - PAINT_ORDER[b.emphasis]);
+  return scene.sort((a, b) => a.layer - b.layer);
 }

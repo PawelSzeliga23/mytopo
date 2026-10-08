@@ -127,13 +127,20 @@ export function depthToZ(depth: number, surface: Surface, relief: number): numbe
 }
 
 /**
- * A route as flat [x, y, z, …] lying on the surface, sampled about every `step` grid cells, slightly in front of it.
+ * A route as flat [x, y, z, …] lying on the surface, sampled about every `step` grid cells, `liftFraction` of the
+ * model width in front of it (lines meant to cover others get a larger lift).
  * Points outside the photo are clamped to its edge; fewer than two points give an empty list.
  */
-export function linePoints3D(points: { x: number; y: number }[], surface: Surface, relief: number, step = 2): number[] {
+export function linePoints3D(
+  points: { x: number; y: number }[],
+  surface: Surface,
+  relief: number,
+  step = 2,
+  liftFraction = 0.004,
+): number[] {
   if (points.length < 2) return [];
   const clamp = (value: number) => Math.min(1, Math.max(0, value));
-  const lift = 0.004 * surface.width;
+  const lift = liftFraction * surface.width;
   const flat: number[] = [];
   const push = (x: number, y: number) =>
     flat.push((x - 0.5) * surface.width, (0.5 - y) * surface.height, depthToZ(surfaceDepthAt(surface, x, y), surface, relief) + lift);
