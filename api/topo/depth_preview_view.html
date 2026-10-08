@@ -2,19 +2,37 @@
 <html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Podgląd 2.5D</title>
 <style>html,body{margin:0;height:100%;overflow:hidden;background:#05080b;color:#cfeffa;font:14px system-ui,sans-serif}
-#ui{position:fixed;top:8px;left:8px;background:#000a;padding:8px 10px;border-radius:8px;line-height:2}
-#ui label{margin-right:10px;white-space:nowrap}a{color:#8ccbe6}input[type=range]{vertical-align:middle;width:120px}</style>
+#ui{position:fixed;top:8px;left:8px;max-height:calc(100% - 16px);overflow:auto;background:#000b;padding:8px 10px;
+border-radius:8px;line-height:2}#ui label{margin-right:10px;white-space:nowrap}a{color:#8ccbe6}
+input[type=range]{vertical-align:middle;width:110px}input[type=color]{vertical-align:middle;width:32px;height:20px;
+border:0;padding:0;background:none}h3{margin:6px 0 0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;
+color:#8aa9b6}small{color:#8aa9b6}canvas.brush{cursor:crosshair}</style>
 </head><body>
-<div id="ui"><a href="index.html">← galeria</a><br>
+<div id="ui"><a href="index.html">← galeria</a>
+<h3>Widok</h3>
 <label><input type="radio" name="mode" value="holo" checked> hologram</label>
 <label><input type="radio" name="mode" value="photo"> zdjęcie</label><br>
 <label>głębia <input id="scale" type="range" min="0" max="0.6" step="0.01" value="0.25"></label><br>
-<label><input id="background" type="checkbox" checked> usuń niebo i tło</label><br>
-<label>wycinanie skoków <input id="cut" type="range" min="0.005" max="0.3" step="0.005" value="0.3"></label>
-<span id="cutValue"></span><br>
 <label><input id="contours" type="checkbox" checked> poziomice</label>
 <label><input id="routes" type="checkbox" checked> drogi</label>
-<label><input id="wire" type="checkbox"> siatka</label></div>
+<label><input id="wire" type="checkbox"> siatka</label>
+<h3>Kolory</h3>
+<label>skała <input id="rockColor" type="color" value="#9ec2db"></label>
+<label>podłoże <input id="groundColor" type="color" value="#949494"></label><br>
+<label>kolory na zdjęciu <input id="tint" type="range" min="0" max="1" step="0.05" value="0"></label>
+<h3>Tło i artefakty</h3>
+<label><input id="background" type="checkbox" checked> usuń niebo i tło</label><br>
+<label>przytnij krawędź <input id="erode" type="range" min="0" max="6" step="1" value="0"></label><span id="erodeValue"></span><br>
+<label>wygładzanie <input id="smooth" type="range" min="0" max="4" step="1" value="0"></label><span id="smoothValue"></span><br>
+<label>wycinanie skoków <input id="cut" type="range" min="0.005" max="0.3" step="0.005" value="0.3"></label><span id="cutValue"></span>
+<h3>Ręczne poprawki</h3>
+<label><input type="radio" name="tool" value="orbit" checked> obracanie</label>
+<label><input type="radio" name="tool" value="flatten"> spłaszcz</label><br>
+<label><input type="radio" name="tool" value="erase"> gumka</label>
+<label><input type="radio" name="tool" value="restore"> przywróć</label><br>
+<label>pędzel <input id="brush" type="range" min="2" max="30" step="1" value="8"></label>
+<button id="reset">cofnij wszystko</button><br>
+<small>Pędzle: przeciągnij po modelu. Poprawki nie są zapisywane (podgląd).</small></div>
 <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.170.0/build/three.module.js",
 "three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/"}}</script>
 <script type="module">
@@ -28,34 +46,123 @@ const params = new URLSearchParams(location.hash.slice(1));  // hash survives th
 const id = params.get("id");
 const $ = (selector) => document.querySelector(selector);
 
-// 16-bit depth packed into R (high byte) and G (low byte); read without colour conversion.
-const depthBlob = await (await fetch(`${id}-glebia16.png`)).blob();
-const bitmap = await createImageBitmap(depthBlob, { colorSpaceConversion: "none", premultiplyAlpha: "none" });
-const W = bitmap.width, H = bitmap.height;
-const ctx = new OffscreenCanvas(W, H).getContext("2d", { willReadFrequently: true });
-ctx.drawImage(bitmap, 0, 0);
-const rgba = ctx.getImageData(0, 0, W, H).data;
-const depth = new Float32Array(W * H);
-for (let i = 0; i < W * H; i++) depth[i] = (rgba[4 * i] * 256 + rgba[4 * i + 1]) / 65535;
-const lines = await (await fetch(`${id}-linie.json`)).json();
-
-// Classes per pixel: 0 other, 1 vegetation, 2 sky, 3 rock, 4 ground (missing file = everything is rock).
-const ROCK = 3, GROUND = 4;
-const classes = new Uint8Array(W * H).fill(ROCK);
-const classResponse = await fetch(`${id}-klasy.png`);
-if (classResponse.ok) {
-  const classBitmap = await createImageBitmap(await classResponse.blob(), { colorSpaceConversion: "none", premultiplyAlpha: "none" });
-  const classCtx = new OffscreenCanvas(W, H).getContext("2d", { willReadFrequently: true });
-  classCtx.drawImage(classBitmap, 0, 0, W, H);
-  const classPixels = classCtx.getImageData(0, 0, W, H).data;
-  for (let i = 0; i < W * H; i++) classes[i] = classPixels[4 * i];
+async function readPixels(url, width, height) {
+  const response = await fetch(url);
+  if (!response.ok) return null;
+  const bitmap = await createImageBitmap(await response.blob(), { colorSpaceConversion: "none", premultiplyAlpha: "none" });
+  const ctx = new OffscreenCanvas(width ?? bitmap.width, height ?? bitmap.height).getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(bitmap, 0, 0, ctx.canvas.width, ctx.canvas.height);
+  return ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
 }
+
+// 16-bit depth packed into R (high byte) and G (low byte).
+const depthPixels = await readPixels(`${id}-glebia16.png`);
+const W = depthPixels.width, H = depthPixels.height;
+const depth = new Float32Array(W * H);
+for (let i = 0; i < W * H; i++) depth[i] = (depthPixels.data[4 * i] * 256 + depthPixels.data[4 * i + 1]) / 65535;
+// Classes: 0 other, 1 vegetation, 2 sky, 3 rock, 4 ground (missing file = everything is rock).
+const ROCK = 3, GROUND = 4;
+const classPixels = await readPixels(`${id}-klasy.png`, W, H);
+const classes = new Uint8Array(W * H).fill(ROCK);
+if (classPixels) for (let i = 0; i < W * H; i++) classes[i] = classPixels.data[4 * i];
+const lines = await (await fetch(`${id}-linie.json`)).json();
 
 const aspect = W / H;
 const width = aspect >= 1 ? 1.6 : 1.6 * aspect;
 const height = width / aspect;
 const GX = aspect >= 1 ? 384 : Math.round(384 * aspect);
 const GY = aspect >= 1 ? Math.round(384 / aspect) : 384;
+const NX = GX + 1, count = NX * (GY + 1);
+
+// Per grid node: depth from the map, class, and the user's edits.
+const baseDepth = new Float32Array(count);
+const nodeClass = new Float32Array(count);
+const positions = new Float32Array(count * 3);
+const uvs = new Float32Array(count * 2);
+for (let j = 0; j <= GY; j++) {
+  for (let i = 0; i <= GX; i++) {
+    const k = j * NX + i, u = i / GX, v = j / GY;
+    const pixel = Math.round(v * (H - 1)) * W + Math.round(u * (W - 1));
+    baseDepth[k] = depth[pixel];
+    nodeClass[k] = classes[pixel];
+    positions[3 * k] = (u - 0.5) * width;
+    positions[3 * k + 1] = (0.5 - v) * height;
+    uvs[2 * k] = u;
+    uvs[2 * k + 1] = 1 - v;
+  }
+}
+let smoothDepth = baseDepth;                  // after the "wygładzanie" median
+const nodeDepth = new Float32Array(baseDepth); // what is drawn: smoothDepth or a flattened value
+const flattened = new Uint8Array(count);
+const erased = new Uint8Array(count);
+let solid = new Uint8Array(count);             // rock or ground, after "przytnij krawędź"
+
+const geometry = new THREE.BufferGeometry();
+geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+geometry.setAttribute("depth", new THREE.BufferAttribute(nodeDepth, 1));
+geometry.setAttribute("cls", new THREE.BufferAttribute(nodeClass, 1));
+
+function median(values) {
+  values.sort((p, q) => p - q);
+  return values[values.length >> 1];
+}
+
+function applySmooth() {
+  const radius = Number($("#smooth").value);
+  $("#smoothValue").textContent = radius ? ` ${radius}` : " wył.";
+  if (!radius) smoothDepth = baseDepth;
+  else {
+    smoothDepth = new Float32Array(count);
+    for (let j = 0; j <= GY; j++) for (let i = 0; i <= GX; i++) {
+      const values = [];
+      for (let dj = -radius; dj <= radius; dj++) for (let di = -radius; di <= radius; di++) {
+        const ii = Math.min(GX, Math.max(0, i + di)), jj = Math.min(GY, Math.max(0, j + dj));
+        values.push(baseDepth[jj * NX + ii]);
+      }
+      smoothDepth[j * NX + i] = median(values);
+    }
+  }
+  for (let k = 0; k < count; k++) if (!flattened[k]) nodeDepth[k] = smoothDepth[k];
+  applyScale();
+  buildIndex();
+}
+
+function applyErode() {
+  const steps = Number($("#erode").value);
+  $("#erodeValue").textContent = steps ? ` ${steps}` : " wył.";
+  solid = new Uint8Array(count);
+  for (let k = 0; k < count; k++) solid[k] = nodeClass[k] === ROCK || nodeClass[k] === GROUND ? 1 : 0;
+  for (let s = 0; s < steps; s++) {
+    const next = new Uint8Array(solid);
+    for (let j = 0; j <= GY; j++) for (let i = 0; i <= GX; i++) {
+      const k = j * NX + i;
+      if (solid[k] && ((i > 0 && !solid[k - 1]) || (i < GX && !solid[k + 1]) ||
+          (j > 0 && !solid[k - NX]) || (j < GY && !solid[k + NX]))) next[k] = 0;
+    }
+    solid = next;
+  }
+  buildIndex();
+}
+
+// Triangles are dropped when erased, outside rock/ground (with "usuń niebo i tło") or across a big depth jump.
+function buildIndex() {
+  const cutValue = Number($("#cut").value);
+  $("#cutValue").textContent = cutValue >= 0.3 ? " wył." : ` ${(cutValue * 100).toFixed(1)}%`;
+  const cut = cutValue >= 0.3 ? Infinity : cutValue;
+  const onlyRock = $("#background").checked;
+  const keepNode = (k) => !erased[k] && (!onlyRock || solid[k]);
+  const keep = (a, b, c) => keepNode(a) && keepNode(b) && keepNode(c) &&
+    Math.max(nodeDepth[a], nodeDepth[b], nodeDepth[c]) - Math.min(nodeDepth[a], nodeDepth[b], nodeDepth[c]) <= cut;
+  const index = [];
+  for (let j = 0; j < GY; j++) for (let i = 0; i < GX; i++) {
+    const a = j * NX + i, b = a + 1, c = a + NX, d = c + 1;
+    if (keep(a, c, b)) index.push(a, c, b);
+    if (keep(b, c, d)) index.push(b, c, d);
+  }
+  geometry.setIndex(index);
+  geometry.computeVertexNormals();
+}
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(devicePixelRatio);
@@ -66,65 +173,22 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.01, 100);
 camera.position.set(0, 0, 2.6);
 
-// Mesh: one vertex per grid node, depth from the nearest depth-map pixel.
-const count = (GX + 1) * (GY + 1);
-const positions = new Float32Array(count * 3);
-const uvs = new Float32Array(count * 2);
-const nodeDepth = new Float32Array(count);
-const nodeClass = new Float32Array(count);
-for (let j = 0; j <= GY; j++) {
-  for (let i = 0; i <= GX; i++) {
-    const k = j * (GX + 1) + i, u = i / GX, v = j / GY;
-    const pixel = Math.round(v * (H - 1)) * W + Math.round(u * (W - 1));
-    nodeDepth[k] = depth[pixel];
-    nodeClass[k] = classes[pixel];
-    positions[3 * k] = (u - 0.5) * width;
-    positions[3 * k + 1] = (0.5 - v) * height;
-    uvs[2 * k] = u;
-    uvs[2 * k + 1] = 1 - v;
-  }
-}
-const geometry = new THREE.BufferGeometry();
-geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
-geometry.setAttribute("depth", new THREE.BufferAttribute(nodeDepth, 1));
-geometry.setAttribute("cls", new THREE.BufferAttribute(nodeClass, 1));
-
-// Triangles whose corners differ in depth by more than `cut` (fraction of the depth range) are not drawn.
-// With `onlyRock`, triangles touching sky, vegetation or other background are not drawn either.
-function buildIndex(cut, onlyRock) {
-  const index = [];
-  const solid = (k) => nodeClass[k] === ROCK || nodeClass[k] === GROUND;
-  const keep = (a, b, c) =>
-    (!onlyRock || (solid(a) && solid(b) && solid(c))) &&
-    Math.max(nodeDepth[a], nodeDepth[b], nodeDepth[c]) - Math.min(nodeDepth[a], nodeDepth[b], nodeDepth[c]) <= cut;
-  for (let j = 0; j < GY; j++) {
-    for (let i = 0; i < GX; i++) {
-      const a = j * (GX + 1) + i, b = a + 1, c = a + GX + 1, d = c + 1;
-      if (keep(a, c, b)) index.push(a, c, b);
-      if (keep(b, c, d)) index.push(b, c, d);
-    }
-  }
-  geometry.setIndex(index);
-}
-
-const photo = new THREE.TextureLoader().load(`${id}-zdjecie.jpg`);
-photo.colorSpace = THREE.SRGBColorSpace;
-const photoMaterial = new THREE.MeshBasicMaterial({ map: photo, side: THREE.DoubleSide });
+const colors = { rock: { value: new THREE.Color() }, ground: { value: new THREE.Color() } };
+const vertexShader = `
+  attribute float depth; attribute float cls;
+  varying vec3 vNormal; varying vec3 vView; varying float vDepth; varying float vGround; varying vec2 vUv;
+  void main() {
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    vNormal = normalize(normalMatrix * normal); vView = -mv.xyz; vDepth = depth; vUv = uv;
+    vGround = cls > 3.5 ? 1.0 : 0.0;
+    gl_Position = projectionMatrix * mv;
+  }`;
 const holoMaterial = new THREE.ShaderMaterial({
   side: THREE.DoubleSide,
-  uniforms: { contours: { value: 1 }, levels: { value: 40 } },
-  vertexShader: `
-    attribute float depth; attribute float cls;
-    varying vec3 vNormal; varying vec3 vView; varying float vDepth; varying float vGround;
-    void main() {
-      vec4 mv = modelViewMatrix * vec4(position, 1.0);
-      vNormal = normalize(normalMatrix * normal); vView = -mv.xyz; vDepth = depth;
-      vGround = cls > 3.5 ? 1.0 : 0.0;
-      gl_Position = projectionMatrix * mv;
-    }`,
+  uniforms: { contours: { value: 1 }, levels: { value: 40 }, rock: colors.rock, ground: colors.ground },
+  vertexShader,
   fragmentShader: `
-    uniform float contours; uniform float levels;
+    uniform float contours; uniform float levels; uniform vec3 rock; uniform vec3 ground;
     varying vec3 vNormal; varying vec3 vView; varying float vDepth; varying float vGround;
     void main() {
       vec3 n = normalize(vNormal);
@@ -133,25 +197,40 @@ const holoMaterial = new THREE.ShaderMaterial({
       float rim = pow(1.0 - abs(dot(n, normalize(vView))), 2.0);
       float d = vDepth * levels;
       float line = (1.0 - min(abs(fract(d - 0.5) - 0.5) / fwidth(d), 1.0)) * contours;
-      // Rock: soft light blue; ground: neutral grey. Muted on purpose — the routes are the bright elements.
-      vec3 shadow = mix(vec3(0.10, 0.14, 0.18), vec3(0.16, 0.16, 0.16), vGround);
-      vec3 lit = mix(vec3(0.62, 0.76, 0.86), vec3(0.58, 0.58, 0.58), vGround);
-      vec3 color = mix(shadow, lit, light) + line * vec3(0.85, 0.93, 1.0) * 0.18 + rim * vec3(0.5, 0.65, 0.8) * 0.12;
+      vec3 lit = mix(rock, ground, vGround);
+      vec3 color = mix(lit * 0.22, lit, light) + line * vec3(0.85, 0.93, 1.0) * 0.18 + rim * lit * 0.15;
       gl_FragColor = vec4(color, 1.0);
+      #include <colorspace_fragment>
+    }`,
+});
+const photo = new THREE.TextureLoader().load(`${id}-zdjecie.jpg`);
+photo.colorSpace = THREE.SRGBColorSpace;
+const photoMaterial = new THREE.ShaderMaterial({
+  side: THREE.DoubleSide,
+  uniforms: { map: { value: photo }, tint: { value: 0 }, rock: colors.rock, ground: colors.ground },
+  vertexShader,
+  fragmentShader: `
+    uniform sampler2D map; uniform float tint; uniform vec3 rock; uniform vec3 ground;
+    varying float vGround; varying vec2 vUv;
+    void main() {
+      vec3 texel = texture2D(map, vUv).rgb;
+      float luminance = dot(texel, vec3(0.2126, 0.7152, 0.0722));
+      vec3 tinted = luminance * mix(rock, ground, vGround) * 2.0;  // keeps the photo's light and shade
+      gl_FragColor = vec4(mix(texel, tinted, tint), 1.0);
+      #include <colorspace_fragment>
     }`,
 });
 const mesh = new THREE.Mesh(geometry, holoMaterial);
 scene.add(mesh);
 
-// Route lines: depth of each sample = median of a 9x9 window, so a branch pixel does not pull the line forward.
-function medianDepth(x, y) {
-  const cx = Math.round(x * (W - 1)), cy = Math.round(y * (H - 1)), values = [];
-  for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
-    const px = Math.min(W - 1, Math.max(0, cx + dx)), py = Math.min(H - 1, Math.max(0, cy + dy));
-    values.push(depth[py * W + px]);
+// Route lines follow the drawn surface: depth = median of the 5x5 grid nodes around each sample.
+function surfaceDepth(x, y) {
+  const ci = Math.round(x * GX), cj = Math.round(y * GY), values = [];
+  for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) {
+    const ii = Math.min(GX, Math.max(0, ci + di)), jj = Math.min(GY, Math.max(0, cj + dj));
+    values.push(nodeDepth[jj * NX + ii]);
   }
-  values.sort((p, q) => p - q);
-  return values[values.length >> 1];
+  return median(values);
 }
 const routes = new THREE.Group();
 scene.add(routes);
@@ -167,7 +246,7 @@ function buildRoutes(scale) {
       const steps = Math.max(1, Math.round(Math.hypot((x1 - x0) * W, (y1 - y0) * H) / 6));
       for (let t = 0; t < steps + (s === last ? 1 : 0); t++) {
         const x = x0 + ((x1 - x0) * t) / steps, y = y0 + ((y1 - y0) * t) / steps;
-        flat.push((x - 0.5) * width, (0.5 - y) * height, (medianDepth(x, y) - 0.5) * scale + 0.004 * width);
+        flat.push((x - 0.5) * width, (0.5 - y) * height, (surfaceDepth(x, y) - 0.5) * scale + 0.004 * width);
       }
     }
     if (flat.length < 6) continue;
@@ -180,7 +259,7 @@ function buildRoutes(scale) {
     for (const [x, y, , visible] of route.points) {
       if (!visible) continue;
       const bolt = new THREE.Mesh(new THREE.SphereGeometry(0.006 * width), new THREE.MeshBasicMaterial({ color: 0xffe066 }));
-      bolt.position.set((x - 0.5) * width, (0.5 - y) * height, (medianDepth(x, y) - 0.5) * scale + 0.006 * width);
+      bolt.position.set((x - 0.5) * width, (0.5 - y) * height, (surfaceDepth(x, y) - 0.5) * scale + 0.006 * width);
       routes.add(bolt);
     }
   }
@@ -190,29 +269,88 @@ function applyScale() {
   const scale = Number($("#scale").value) * width;
   for (let k = 0; k < count; k++) positions[3 * k + 2] = (nodeDepth[k] - 0.5) * scale;
   geometry.attributes.position.needsUpdate = true;
+  geometry.attributes.depth.needsUpdate = true;
   geometry.computeVertexNormals();
   buildRoutes(scale);
-}
-function applyCut() {
-  const cut = Number($("#cut").value);
-  $("#cutValue").textContent = cut >= 0.3 ? "(wyłączone)" : `(${(cut * 100).toFixed(1)}% zakresu)`;
-  buildIndex(cut >= 0.3 ? Infinity : cut, $("#background").checked);
-  geometry.computeVertexNormals();
 }
 function applyMode() {
   mesh.material = $("input[name=mode]:checked").value === "holo" ? holoMaterial : photoMaterial;
   mesh.material.wireframe = $("#wire").checked;
 }
-$("#scale").addEventListener("input", applyScale);
-$("#cut").addEventListener("input", applyCut);
-$("#background").addEventListener("change", applyCut);
-for (const radio of document.querySelectorAll("input[name=mode]")) radio.addEventListener("change", applyMode);
-$("#wire").addEventListener("change", applyMode);
-$("#contours").addEventListener("change", (e) => { holoMaterial.uniforms.contours.value = e.target.checked ? 1 : 0; });
-$("#routes").addEventListener("change", (e) => { routes.visible = e.target.checked; });
-applyCut();
-applyScale();
-applyMode();
+function applyColors() {
+  colors.rock.value.set($("#rockColor").value);
+  colors.ground.value.set($("#groundColor").value);
+  photoMaterial.uniforms.tint.value = Number($("#tint").value);
+}
+
+// Manual brushes. Hits are taken on an invisible full grid, so erased places can be restored.
+const pickGeometry = new THREE.BufferGeometry();
+pickGeometry.setAttribute("position", geometry.attributes.position);
+pickGeometry.setAttribute("uv", geometry.attributes.uv);
+{
+  const index = [];
+  for (let j = 0; j < GY; j++) for (let i = 0; i < GX; i++) {
+    const a = j * NX + i;
+    index.push(a, a + NX, a + 1, a + 1, a + NX, a + NX + 1);
+  }
+  pickGeometry.setIndex(index);
+}
+const pickMesh = new THREE.Mesh(pickGeometry, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+pickMesh.visible = false;
+scene.add(pickMesh);
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+function brushNodes(ci, cj, radius) {
+  const nodes = [];
+  for (let dj = -radius; dj <= radius; dj++) for (let di = -radius; di <= radius; di++) {
+    const ii = ci + di, jj = cj + dj;
+    if (ii >= 0 && ii <= GX && jj >= 0 && jj <= GY && di * di + dj * dj <= radius * radius) nodes.push(jj * NX + ii);
+  }
+  return nodes;
+}
+
+// "Spłaszcz": brushed nodes take the median depth of the surrounding ring (rock/ground only, not yet flattened).
+function paint(tool, ci, cj) {
+  const radius = Number($("#brush").value);
+  const nodes = brushNodes(ci, cj, radius);
+  if (tool === "flatten") {
+    const ring = brushNodes(ci, cj, radius * 2).filter((k) => {
+      const di = (k % NX) - ci, dj = Math.floor(k / NX) - cj;
+      return di * di + dj * dj > radius * radius && solid[k] && !erased[k] && !flattened[k];
+    });
+    if (!ring.length) return;
+    const level = median(ring.map((k) => nodeDepth[k]));
+    for (const k of nodes) { nodeDepth[k] = level; flattened[k] = 1; }
+    applyScale();
+    buildIndex();
+  } else if (tool === "erase") {
+    for (const k of nodes) erased[k] = 1;
+    buildIndex();
+  } else {
+    for (const k of nodes) { erased[k] = 0; flattened[k] = 0; nodeDepth[k] = smoothDepth[k]; }
+    applyScale();
+    buildIndex();
+  }
+}
+
+let painting = false;
+function strokeAt(event) {
+  const tool = $("input[name=tool]:checked").value;
+  if (tool === "orbit") return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
+  raycaster.setFromCamera(pointer, camera);
+  const hit = raycaster.intersectObject(pickMesh)[0];
+  if (hit) paint(tool, Math.round(hit.uv.x * GX), Math.round((1 - hit.uv.y) * GY));
+}
+renderer.domElement.addEventListener("pointerdown", (event) => {
+  if ($("input[name=tool]:checked").value === "orbit") return;
+  painting = true;
+  strokeAt(event);
+});
+renderer.domElement.addEventListener("pointermove", (event) => { if (painting) strokeAt(event); });
+addEventListener("pointerup", () => { painting = false; });
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -222,6 +360,35 @@ controls.minPolarAngle = Math.PI / 2 - Math.PI / 9;
 controls.maxPolarAngle = Math.PI / 2 + Math.PI / 9;
 controls.minDistance = 0.8;
 controls.maxDistance = 5;
+
+function applyTool() {
+  const orbit = $("input[name=tool]:checked").value === "orbit";
+  controls.enableRotate = orbit;
+  renderer.domElement.classList.toggle("brush", !orbit);
+}
+
+$("#scale").addEventListener("input", applyScale);
+$("#cut").addEventListener("input", buildIndex);
+$("#background").addEventListener("change", buildIndex);
+$("#erode").addEventListener("input", applyErode);
+$("#smooth").addEventListener("change", applySmooth);
+for (const radio of document.querySelectorAll("input[name=mode]")) radio.addEventListener("change", applyMode);
+for (const radio of document.querySelectorAll("input[name=tool]")) radio.addEventListener("change", applyTool);
+$("#wire").addEventListener("change", applyMode);
+$("#contours").addEventListener("change", (e) => { holoMaterial.uniforms.contours.value = e.target.checked ? 1 : 0; });
+$("#routes").addEventListener("change", (e) => { routes.visible = e.target.checked; });
+for (const input of ["#rockColor", "#groundColor", "#tint"]) $(input).addEventListener("input", applyColors);
+$("#reset").addEventListener("click", () => {
+  erased.fill(0);
+  flattened.fill(0);
+  applySmooth();
+});
+
+applyColors();
+applyErode();
+applySmooth();
+applyMode();
+applyTool();
 
 addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;
