@@ -2,7 +2,7 @@
 <html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Podgląd 2.5D</title>
 <style>html,body{margin:0;height:100%;overflow:hidden;background:#05080b;color:#cfeffa;font:14px system-ui,sans-serif}
-#ui{position:fixed;top:8px;left:8px;max-height:calc(100% - 16px);overflow:auto;background:#000b;padding:8px 10px;
+#ui{position:fixed;top:8px;left:8px;max-width:330px;max-height:calc(100% - 16px);overflow:auto;background:#000b;padding:8px 10px;
 border-radius:8px;line-height:2}#ui label{margin-right:10px;white-space:nowrap}a{color:#8ccbe6}
 input[type=range]{vertical-align:middle;width:110px}input[type=color]{vertical-align:middle;width:32px;height:20px;
 border:0;padding:0;background:none}h3{margin:6px 0 0;font-size:12px;text-transform:uppercase;letter-spacing:.06em;
@@ -30,9 +30,11 @@ color:#8aa9b6}small{color:#8aa9b6}canvas.brush{cursor:crosshair}</style>
 <label><input type="radio" name="tool" value="flatten"> spłaszcz</label><br>
 <label><input type="radio" name="tool" value="erase"> gumka</label>
 <label><input type="radio" name="tool" value="restore"> przywróć</label><br>
+<label><input type="radio" name="tool" value="ground"> maluj podłoże</label>
+<label><input type="radio" name="tool" value="rock"> maluj skałę</label><br>
 <label>pędzel <input id="brush" type="range" min="2" max="30" step="1" value="8"></label>
 <button id="reset">cofnij wszystko</button><br>
-<small>Pędzle: przeciągnij po modelu. Poprawki nie są zapisywane (podgląd).</small></div>
+<small>Pędzle: przeciągnij po modelu. „Maluj podłoże/skałę” zmienia klasę (kolor), także w miejscach usuniętych jako tło. Poprawki nie są zapisywane (podgląd).</small></div>
 <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.170.0/build/three.module.js",
 "three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/"}}</script>
 <script type="module">
@@ -77,6 +79,7 @@ const NX = GX + 1, count = NX * (GY + 1);
 // Per grid node: depth from the map, class, and the user's edits.
 const baseDepth = new Float32Array(count);
 const nodeClass = new Float32Array(count);
+const originalClass = new Float32Array(count);
 const positions = new Float32Array(count * 3);
 const uvs = new Float32Array(count * 2);
 for (let j = 0; j <= GY; j++) {
@@ -85,6 +88,7 @@ for (let j = 0; j <= GY; j++) {
     const pixel = Math.round(v * (H - 1)) * W + Math.round(u * (W - 1));
     baseDepth[k] = depth[pixel];
     nodeClass[k] = classes[pixel];
+    originalClass[k] = classes[pixel];
     positions[3 * k] = (u - 0.5) * width;
     positions[3 * k + 1] = (0.5 - v) * height;
     uvs[2 * k] = u;
@@ -327,10 +331,17 @@ function paint(tool, ci, cj) {
   } else if (tool === "erase") {
     for (const k of nodes) erased[k] = 1;
     buildIndex();
+  } else if (tool === "ground" || tool === "rock") {
+    for (const k of nodes) nodeClass[k] = tool === "ground" ? GROUND : ROCK;
+    geometry.attributes.cls.needsUpdate = true;
+    applyErode();
   } else {
-    for (const k of nodes) { erased[k] = 0; flattened[k] = 0; nodeDepth[k] = smoothDepth[k]; }
+    for (const k of nodes) {
+      erased[k] = 0; flattened[k] = 0; nodeDepth[k] = smoothDepth[k]; nodeClass[k] = originalClass[k];
+    }
+    geometry.attributes.cls.needsUpdate = true;
     applyScale();
-    buildIndex();
+    applyErode();
   }
 }
 
@@ -381,6 +392,9 @@ for (const input of ["#rockColor", "#groundColor", "#tint"]) $(input).addEventLi
 $("#reset").addEventListener("click", () => {
   erased.fill(0);
   flattened.fill(0);
+  nodeClass.set(originalClass);
+  geometry.attributes.cls.needsUpdate = true;
+  applyErode();
   applySmooth();
 });
 
