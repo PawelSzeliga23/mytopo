@@ -28,7 +28,8 @@ services:
     command: ["sh", "-c", "alembic upgrade head && uvicorn topo.main:app --host 0.0.0.0 --port 8000 --reload"]
     volumes:
       - ./api:/app
-      - media:/data/media
+      - ./media:/data/media
+      - ./cache:/data/cache
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -37,4 +38,3 @@ services:
 
 volumes:
   db-data:
-  media:

@@ -1,0 +1,116 @@
+import io
+import json
+from contextlib import contextmanager
+from pathlib import Path
+
+from PIL import Image
+from sqlalchemy import func, select, text
+from sqlalchemy_continuum import version_class
+
+from topo.importer.fetch import FetchError
+from topo.importer.portalgorski.parse import BASE_URL, PATHS_URL, START_URL
+from topo.importer.portalgorski.run import format_report, import_portalgorski
+from topo.models import Area, Crag, Route, RouteLine
+
+FIXTURES = Path(__file__).parent / "fixtures" / "portalgorski"
+ZABI_URL = BASE_URL + "/Żabi-Koń,Grupa-Żabiego-Konia,Dolina-Kobylańska,Jura-Krakowsko-Częstochowska,skala,111"
+SZCZYRZYC_URL = BASE_URL + "/Szczyrzyc,Beskidy,skala,955"
+SIZES = {"zabi_kon_3": (1600, 1063), "zabi_kon_1": (1063, 1600), "kapliczka": (1600, 1143),
+         "szcz_1": (1008, 1600), "szcz_2": (1600, 990), "szcz_3": (996, 1600), "szcz_4": (1600, 1082)}
+EMPTY_PATHS = json.dumps({"status": 1, "data": [], "pathsListBottom": ""}).encode()
+
+
+class FakeFetcher:
+    def __init__(self, failing: set[str] = frozenset()):
+        self.failing = failing
+        self.requests: list[str] = []
+
+    def get(self, url):
+        self.requests.append(url)
+        if url in self.failing:
+            raise FetchError(f"HTTP 503: GET {url}")
+        if url == START_URL:
+            return json.dumps({"results": [
+                {"lat": "50.15598612", "lng": "19.75617396", "title": "Żabi Koń", "type": "rock", "url": ZABI_URL[len(BASE_URL):]},
+                {"lat": "49.802559", "lng": "20.169329", "title": "Szczyrzyc", "type": "rock", "url": SZCZYRZYC_URL[len(BASE_URL):]},
+                {"lat": "50.1", "lng": "19.8", "title": "Zła", "type": "rock", "url": "/Zla,skala,([0-9]+)"},
+            ]}).encode()
+        if url == ZABI_URL:
+            return (FIXTURES / "skala111.html").read_bytes()
+        if url == SZCZYRZYC_URL:
+            return (FIXTURES / "skala955.html").read_bytes()
+        for key, size in SIZES.items():
+            if key in url:
+                buffer = io.BytesIO()
+                Image.new("RGB", size, (80, 80, 80)).save(buffer, "JPEG")
+                return buffer.getvalue()
+        raise AssertionError(f"nieoczekiwany adres {url}")
+
+    def post(self, url, data):
+        assert url == PATHS_URL
+        name = {"46": "paths46.json", "2533": "paths2533.json"}.get(data["imageId"])
+        return (FIXTURES / name).read_bytes() if name else EMPTY_PATHS
+
+
+def factory_for(session):
+    @contextmanager
+    def factory():
+        yield session
+
+    return factory
+
+
+def run(session, tmp_path, fetcher=None, **kw):
+    return import_portalgorski(factory_for(session), fetcher or FakeFetcher(), tmp_path, log=lambda _: None, **kw)
+
+
+def count(session, model):
+    return session.scalar(select(func.count()).select_from(model))
+
+
+def test_import_two_rocks(session, tmp_path):
+    report = run(session, tmp_path)
+
+    assert count(session, Crag) == 2
+    assert count(session, Area) == 4
+    assert count(session, Route) == 10
+    assert count(session, RouteLine) == 10
+    assert report.invalid_urls == ["/Zla,skala,([0-9]+)"]
+    assert report.errors == []
+    region = session.scalar(select(Area).where(Area.source_id == "region:100"))
+    crag_count = session.scalar(text("SELECT crag_count FROM area_geom WHERE area_id = :id"), {"id": region.id})
+    assert crag_count == 1
+
+
+def test_reimport_is_idempotent(session, tmp_path):
+    run(session, tmp_path)
+    slugs = sorted(session.scalars(select(Crag.slug)).all())
+    route_ids = sorted(session.scalars(select(Route.id)).all())
+    versions = count(session, version_class(Route))
+
+    report = run(session, tmp_path)
+
+    assert sorted(session.scalars(select(Crag.slug)).all()) == slugs
+    assert sorted(session.scalars(select(Route.id)).all()) == route_ids
+    assert count(session, version_class(Route)) == versions
+    assert (report.crags_created, report.crags_updated) == (0, 0)
+
+
+def test_fetch_error_for_one_rock_does_not_stop_import(session, tmp_path):
+    report = run(session, tmp_path, FakeFetcher(failing={SZCZYRZYC_URL}))
+    assert count(session, Crag) == 1
+    assert len(report.errors) == 1 and "Szczyrzyc" in report.errors[0]
+
+
+def test_only_area_and_limit(session, tmp_path):
+    run(session, tmp_path, only_area="Dolina Kobylańska")
+    assert session.scalars(select(Crag.name)).all() == ["Żabi Koń"]
+
+    run(session, tmp_path, limit=1)
+    assert count(session, Crag) == 1
+
+
+def test_format_report_is_polish(session, tmp_path):
+    text = format_report(run(session, tmp_path))
+    assert "Skały: 2 nowych" in text
+    assert "Pominięte błędne adresy z listy skał (1)" in text

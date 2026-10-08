@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     public_url: str = "http://localhost:5173"
     media_url: str = "/media"
     media_root: str = "/data/media"
+    cache_dir: str = "/data/cache"
 
 
 @lru_cache
