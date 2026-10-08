@@ -100,7 +100,7 @@ depth_job      id, wall_id, model, status {queued|running|done|failed}, error, c
 
 - Wszystkie tabele treści (`area`, `crag`, `wall`, `route`, `route_line`, `line_point`) mają `source` (`portalgorski` | `wspinanie` | `manual`), `source_id`, `source_url`. Unikalny klucz `(source, source_id)` pozwala powtarzać import bez duplikatów.
 - Droga (`route`) jest odrębna od jej linii na zdjęciu (`route_line`), więc jedna droga może występować na kilku zdjęciach.
-- Środki i obrysy regionów i sektorów nie są przechowywane, tylko liczone z położenia skał: widok `area_geom` (ST_Centroid, ST_ConcaveHull / ST_ConvexHull dla małej liczby punktów; dla sektora z jedną skałą — bufor wokół punktu). Odświeżany jako widok zmaterializowany po imporcie i edycjach.
+- Środki i obrysy regionów i sektorów nie są przechowywane, tylko liczone z położenia skał: widok zmaterializowany `area_geom` (środek: ST_Centroid; obrys: ST_ConvexHull z buforem 50 m, co zawsze daje poligon — również dla sektora z jedną lub dwiema skałami). Odświeżany po imporcie i edycjach.
 - Skała może należeć bezpośrednio do regionu (bez sektora).
 - `grade_sort`: odwzorowanie skali krakowskiej (I … VI.8, z „+”, „-” i wycenami łamanymi typu „VI.1+/2”) na liczbę całkowitą rosnącą z trudnością. Wycena łamana dostaje wartość między sąsiednimi. Nieznana wycena → `NULL`, a import zgłasza ją w raporcie.
 - Historia: SQLAlchemy-Continuum dodaje tabele `*_version` i `transaction`; `transaction` rozszerzone o `author` (nick) i `comment`.
