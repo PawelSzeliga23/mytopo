@@ -141,16 +141,18 @@ Wygląd ma być ładny i nowoczesny. Przed implementacją każdej strony (mapa, 
 
 ### 6.2 Strona skały
 - Nagłówek: nazwa, ścieżka obszar → region → sektor, wystawa, wysokość, rodzaj skały, czas dojścia, opis i dojście.
-- Przeglądarka ściany: 2.5D domyślnie, przełącznik na 2D; miniatury do przełączania ścian.
+- Przeglądarka ściany: 2D domyślnie dla każdej ściany, przełącznik „2D · 2.5D” w rogu (tylko na ścianach z gotową głębią, gdzie roślinność zasłania ≤ 10% skały, albo włączonych ręcznie); miniatury do przełączania ścian. (Zmiana po planie 5 — decyzja użytkownika.)
 - Lista dróg z numerami jak na topo: nazwa, wycena (krakowska + francuska), długość, asekuracja, autor i rok, opis. Kliknięcie drogi na liście podświetla ją na topo i odwrotnie.
 - Po zalogowaniu: edycja pól skały i dróg, „edytuj topo”, wgranie nowej ściany.
 
-### 6.3 Widok 2.5D
-- `PlaneGeometry` z siatką ~256×384 i `MeshStandardMaterial` z `map` = zdjęcie, `displacementMap` = mapa głębi.
-- Punkty linii: (x,y) → głębia odczytana z mapy głębi (wczytanej do canvas po stronie klienta) → pozycja 3D na powierzchni. Linie przez `<Line>` z drei, wpinki jako billboardy z ikonami według typu, numer drogi przy starcie.
-- OrbitControls z ograniczeniem ±30° w poziomie i ±20° w pionie oraz przybliżaniem; suwak „głębia” skaluje `displacementScale`.
-- Trójkąty na dużych skokach głębi są ukrywane lub przyciemniane (próg skoku względem sąsiadów), żeby ograniczyć „rozciągnięte” krawędzie.
-- Bez WebGL albo przy `depth_status != ready` widok przełącza się sam na 2D.
+### 6.3 Widok 2.5D (stan po planie 5)
+- Siatka węzłów (dłuższy bok 384 oczka) budowana w przeglądarce z `depth.png` (16-bit, dekodowany `fast-png`) i `segments.png` (klasy: 0 inne, 1 roślinność, 2 niebo, 3 skała, 4 podłoże); rysowane tylko trójkąty skały i podłoża — niebo, drzewa i tło usunięte.
+- Wygląd: „hologram” (skała jasnoniebieska, podłoże szare, cieniowanie i słabe poziomice) albo „zdjęcie” (tekstura zdjęcia).
+- Linie dróg: głębia punktu = mediana 5×5 węzłów (gałąź nie wyciąga linii przed ścianę); stała kolejność warstw (jasnoniebieskie › ciemnoniebieskie › czerwone › czarne › bez wyceny, wskazana i zaznaczona na wierzchu), każda warstwa minimalnie dalej od skały; numery jako sprite’y.
+- OrbitControls: ±30° w poziomie, ±20° w pionie, przybliżanie, bez przesuwania; suwak „głębia”; kamera kadruje samą skałę.
+- Decyzja 2.5D: `wall.vegetation_ratio` = udział roślinności w obszarze skały (w każdej kolumnie od szczytu skały do podłoża); > 10% → bez 2.5D, chyba że `wall.depth_enabled` (ręcznie: `topo wall-3d ID on|off|auto`, w planie 7 w edytorze).
+- Bez WebGL, bez gotowej głębi albo gdy model się nie wczyta → 2D.
+- W edytorze (plan 7): pędzle spłaszcz / gumka / maluj podłoże / maluj skałę, wygładzanie, przycinanie krawędzi, kolory skały i podłoża — z zapisem (prototyp w galerii `topo depth-preview`).
 
 ### 6.4 Widok 2D
 react-konva: zdjęcie (WebP), wygładzone linie (`tension`), ikony wpinek, numery; przybliżanie dwoma palcami i kółkiem, przesuwanie.
@@ -193,6 +195,7 @@ na serwerze:
 - Ochrona ręcznych zmian: jeśli rekord ma w historii transakcję z autorem innym niż importer, ponowny import go nie nadpisuje i zgłasza w raporcie.
 - Zdjęcia: korekta orientacji EXIF, zapis oryginału, WebP i miniatury.
 - Raport końcowy: liczby obszarów, regionów, sektorów, skał, ścian, dróg i punktów; błędy; linie z podejrzaną skalą; nieznane wyceny; niedopasowane wpisy z wspinanie.pl.
+- Segmentacja: SegFormer-B5 (ADE20K) w tym samym kroku `topo depth`, zapis `walls/{id}/segments.png` i `wall.vegetation_ratio`.
 - Głębia: Depth Anything V2 — lokalnie na GPU domyślnie Large (licencja CC-BY-NC, projekt jest niekomercyjny), na serwerze Small na CPU (Apache 2.0) dla nowo wgranych zdjęć. Model zapisywany w `wall.depth_model`, co pozwala później przeliczyć lokalnie ściany zrobione modelem Small.
 - Kolejka na serwerze: tabela `depth_job` i wątek w API pobierający zadania (`SELECT … FOR UPDATE SKIP LOCKED`). Bez Redisa i Celery.
 
