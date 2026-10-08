@@ -1,8 +1,10 @@
 from pathlib import Path
 
+import re
+
 import pytest
 
-from topo.importer.portalgorski.parse import BASE_URL, map_point, parse_paths, parse_rock_page, parse_start
+from topo.importer.portalgorski.parse import BASE_URL, _minutes, map_point, parse_paths, parse_rock_page, parse_start
 
 FIXTURES = Path(__file__).parent / "fixtures" / "portalgorski"
 
@@ -121,3 +123,25 @@ def test_parse_paths_failed_status_is_empty():
 )
 def test_map_point(kind_name, type_id, index, expected):
     assert map_point(kind_name, type_id, index) == expected
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [("10 min", 10), ("1 h", 60), ("1,5 h", 90), ("1.5h", 90), ("1 h 30 min", 90), ("brak", None)],
+)
+def test_minutes(value, expected):
+    assert _minutes(value) == expected
+
+
+def test_parse_rock_page_keeps_wall_with_unexpected_description_markup():
+    text = load("skala111.html").decode("utf-8", errors="replace")
+    broken, count = re.subn(
+        r'(<h5>Żabi Koń</h5>\s*<div>\s*)<div class="description darker">.*?</div>',
+        r'<div class="description darker"><div>x</div></div>',
+        text,
+        flags=re.S,
+    )
+    assert count == 1
+    page = parse_rock_page(broken.encode("utf-8"))
+    assert [w.source_id for w in page.walls] == [45, 46, 2531]
+    assert page.walls[1].image_url == BASE_URL + "/images/original/100/9ef/a98/9ef8a98_zabi_kon_1_JPG"

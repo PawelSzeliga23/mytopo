@@ -29,10 +29,11 @@ _WALL = re.compile(
     r'<div>\s*<div class="topoEditor[^"]*" id="topoEditor_(?P<id>\d+)"',
     re.S,
 )
+_WALL_ID = re.compile(r'id="topoEditor_(\d+)"')
 _WALL_IMAGE = re.compile(r"TopoEditorFactory\(\{\s*id:\s*(?P<id>\d+),\s*imageMain:\s*'(?P<image>[^']+)'")
 _HEIGHT = re.compile(r"min\.\s*([\d.]+)\s*m.*?max\.\s*([\d.]+)\s*m", re.S)
 _MINUTES = re.compile(r"(\d+)\s*min")
-_HOURS = re.compile(r"(\d+)\s*h")
+_HOURS = re.compile(r"(\d+(?:[.,]\d+)?)\s*h")
 _LENGTH = re.compile(r"([\d.,]+)\s*m")
 _ROUTE_ROW = re.compile(r"pathLiBottom_(\d+)")
 
@@ -92,15 +93,18 @@ def parse_rock_page(raw: bytes) -> RockPage:
         raise ValueError("Nie rozpoznano strony skały")
     rock = trail[-1]
     images = {int(m["id"]): BASE_URL + m["image"] for m in _WALL_IMAGE.finditer(text)}
-    walls = [
-        WallRef(
-            source_id=int(m["id"]),
-            name=_clean(html.unescape(m["name"])) or None,
-            description=_html_to_text(m["desc"]),
-            image_url=images.get(int(m["id"])),
+    blocks = {int(m["id"]): m for m in _WALL.finditer(text)}
+    walls = []
+    for wall_id in dict.fromkeys(int(i) for i in _WALL_ID.findall(text)):
+        block = blocks.get(wall_id)
+        walls.append(
+            WallRef(
+                source_id=wall_id,
+                name=(_clean(html.unescape(block["name"])) or None) if block else None,
+                description=_html_to_text(block["desc"]) if block else None,
+                image_url=images.get(wall_id),
+            )
         )
-        for m in _WALL.finditer(text)
-    ]
     return RockPage(
         source_id=rock.source_id,
         name=rock.name,
@@ -236,7 +240,7 @@ def _minutes(value: str) -> int | None:
     minutes = _MINUTES.search(value)
     if hours is None and minutes is None:
         return None
-    return (int(hours.group(1)) * 60 if hours else 0) + (int(minutes.group(1)) if minutes else 0)
+    return (round(float(hours.group(1).replace(",", ".")) * 60) if hours else 0) + (int(minutes.group(1)) if minutes else 0)
 
 
 def _html_to_text(fragment: str) -> str | None:
