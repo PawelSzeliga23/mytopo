@@ -1,0 +1,49 @@
+import io
+
+import pytest
+from PIL import Image
+
+from topo.media import InvalidImage, store_wall_image
+
+
+def jpeg(width, height, orientation=None) -> bytes:
+    buffer = io.BytesIO()
+    image = Image.new("RGB", (width, height), (120, 90, 60))
+    if orientation is None:
+        image.save(buffer, "JPEG")
+    else:
+        exif = Image.Exif()
+        exif[0x0112] = orientation
+        image.save(buffer, "JPEG", exif=exif)
+    return buffer.getvalue()
+
+
+def test_store_creates_original_display_and_thumb(tmp_path):
+    data = jpeg(2000, 1000)
+    stored = store_wall_image(tmp_path, 7, data)
+
+    assert stored.original_path == "walls/7/original.jpg"
+    assert stored.image_path == "walls/7/display.webp"
+    assert stored.thumb_path == "walls/7/thumb.webp"
+    assert (stored.width, stored.height) == (2000, 1000)
+    assert (tmp_path / stored.original_path).read_bytes() == data
+    with Image.open(tmp_path / stored.image_path) as display:
+        assert (display.format, display.size) == ("WEBP", (1600, 800))
+    with Image.open(tmp_path / stored.thumb_path) as thumb:
+        assert thumb.size == (400, 200)
+
+
+def test_small_image_is_not_upscaled(tmp_path):
+    stored = store_wall_image(tmp_path, 1, jpeg(800, 600))
+    with Image.open(tmp_path / stored.image_path) as display:
+        assert display.size == (800, 600)
+
+
+def test_exif_rotation_is_applied(tmp_path):
+    stored = store_wall_image(tmp_path, 2, jpeg(200, 100, orientation=6))
+    assert (stored.width, stored.height) == (100, 200)
+
+
+def test_invalid_data_raises(tmp_path):
+    with pytest.raises(InvalidImage):
+        store_wall_image(tmp_path, 3, b"to nie jest obrazek")
