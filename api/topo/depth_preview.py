@@ -68,7 +68,7 @@ def write_gallery(walls: list[Wall], media_root: Path, out_dir: Path) -> Path:
         with Image.open(Path(media_root) / wall.image_path) as photo:
             photo.convert("RGB").save(out_dir / f"{wall.id}-zdjecie.jpg", quality=88)
         title = html.escape(f"{wall.crag.name} — {wall.name or 'ściana'}")
-        view = html.escape(f"view.html?id={wall.id}&w={depth.shape[1]}&h={depth.shape[0]}")
+        view = html.escape(f"view.html#id={wall.id}&w={depth.shape[1]}&h={depth.shape[0]}")
         images = "".join(
             f'<a href="{wall.id}-{name}.jpg"><img src="{wall.id}-{name}.jpg" alt="{label}" loading="lazy"></a>'
             for name, label in (("linie", "zdjęcie z liniami"), ("glebia", "głębia"), ("cien", "cieniowanie"))
@@ -115,7 +115,7 @@ _VIEW = """<!doctype html>
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-const params = new URLSearchParams(location.search);
+const params = new URLSearchParams(location.hash.slice(1));  // hash survives the clean-URL redirect of `serve`
 const id = params.get("id");
 const aspect = Number(params.get("w")) / Number(params.get("h"));
 const width = aspect >= 1 ? 1.6 : 1.6 * aspect;

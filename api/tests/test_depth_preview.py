@@ -52,6 +52,6 @@ def test_write_gallery_creates_files_and_escaped_index(session, tmp_path):
     assert (out / "view.html").exists()
     html = index.read_text(encoding="utf-8")
     assert "Skała &lt;Test&gt;" in html
-    assert f"view.html?id={wall.id}&amp;w=160&amp;h=120" in html
+    assert f"view.html#id={wall.id}&amp;w=160&amp;h=120" in html
     with Image.open(out / f"{wall.id}-szara.png") as gray:
         assert gray.mode == "L" and gray.size == (160, 120)
