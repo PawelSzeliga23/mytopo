@@ -44,6 +44,9 @@ class WallOut(BaseModel):
     depth_url: str | None
     depth_status: str
     depth_model: str | None
+    segments_url: str | None
+    show_3d: bool
+    vegetation_ratio: float | None
     lines: list[LineOut]
 
 

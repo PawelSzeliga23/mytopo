@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, selectinload
 from topo.api.common import area_path, media_url
 from topo.api.errors import not_found
 from topo.db import get_session
+from topo.depth import SEGMENTS_FILE, wants_3d
 from topo.grades import to_french
 from topo.models import Crag, Route, RouteLine, Wall
 from topo.schemas import CragOut, LineOut, RouteOut, WallOut
@@ -27,6 +28,13 @@ def _wall_out(wall: Wall) -> WallOut:
         depth_url=media_url(wall.depth_path) if wall.depth_status == "ready" else None,
         depth_status=wall.depth_status,
         depth_model=wall.depth_model,
+        segments_url=(
+            media_url(f"walls/{wall.id}/{SEGMENTS_FILE}")
+            if wall.depth_status == "ready" and wall.vegetation_ratio is not None
+            else None
+        ),
+        show_3d=wants_3d(wall),
+        vegetation_ratio=wall.vegetation_ratio,
         lines=[LineOut.model_validate(line) for line in wall.lines],
     )
 

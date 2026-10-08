@@ -84,3 +84,37 @@ def test_crag_not_found(client):
     response = client.get("/api/crags/nie-ma")
     assert response.status_code == 404
     assert response.json() == {"code": "not_found", "message": "Nie znaleziono: skała"}
+
+
+def _ready_wall(session, crag, **kw):
+    return f.wall(
+        session, crag, image_path="walls/9/display.webp", depth_path="walls/9/depth.png", depth_status="ready", **kw
+    )
+
+
+def test_clean_wall_shows_3d_with_segments(client, session):
+    crag = make_crag(session)
+    wall = _ready_wall(session, crag, vegetation_ratio=0.04)
+
+    [wall_out] = client.get(f"/api/crags/{crag.slug}").json()["walls"]
+    assert wall_out["show_3d"] is True
+    assert wall_out["segments_url"] == f"/media/walls/{wall.id}/segments.png"
+    assert wall_out["vegetation_ratio"] == 0.04
+
+
+def test_overgrown_wall_is_2d_unless_enabled_by_hand(client, session):
+    crag = make_crag(session)
+    wall = _ready_wall(session, crag, vegetation_ratio=0.4)
+    assert client.get(f"/api/crags/{crag.slug}").json()["walls"][0]["show_3d"] is False
+
+    wall.depth_enabled = True
+    session.flush()
+    assert client.get(f"/api/crags/{crag.slug}").json()["walls"][0]["show_3d"] is True
+
+
+def test_wall_without_depth_has_no_segments_and_no_3d(client, session):
+    crag = make_crag(session)
+    f.wall(session, crag, image_path="walls/3/display.webp", vegetation_ratio=0.0)
+
+    [wall_out] = client.get(f"/api/crags/{crag.slug}").json()["walls"]
+    assert wall_out["segments_url"] is None and wall_out["show_3d"] is False
