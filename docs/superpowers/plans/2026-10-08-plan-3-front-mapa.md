@@ -1766,3 +1766,11 @@ git commit -m "feat: mapa skał z trzema poziomami i tymczasowa strona skały" -
 
 - Strona główna: mapa w stylu „Przewodnik” z regionami, sektorami i skałami; motyw jasny/ciemny; trzy podkłady.
 - Następny krok: plan 4 — strona skały (układ A z `2026-10-08-frontend-design.md` §4): przeglądarka 2D zdjęć ścian z liniami i wpinkami, lista dróg, podświetlanie w obie strony.
+
+## Wnioski z wykonania (do uwzględnienia w kolejnych planach)
+
+- **MapLibre 6 + Vite:** worker trzeba wskazać jawnie (`web/src/map/worker.ts`, `setWorkerUrl` z importem `?url`) — inaczej mapa nie ładuje danych GeoJSON ani w dev, ani w buildzie. Wyrażenia z `["zoom"]` muszą być na najwyższym poziomie `interpolate`/`step`; test `validateStyleMin` w `layers.test.ts` tego pilnuje.
+- **Klikalność a zanikanie warstw:** `isClickableAt` (w `layers.ts`) decyduje o klikaniu i kursorze — przy zmianie progów w `ZOOM` zmieniają się razem. W planie 4 warto wynieść logikę `handleClick` (cechy + zoom + indeks → `Selection`) do czystej funkcji z testem (MapLibre nie działa w jsdom).
+- **Spec §6.1 (`2026-10-08-topo-design.md`) jest nieaktualny w części mapy:** obowiązuje `2026-10-08-frontend-design.md` (liczba skał przy regionie, piny w kolorze akcentu, karta zamiast przejścia od razu na stronę skały). Do odnotowania w spec.
+- **Drobne na później:** cień paneli powtarzany w 3 plikach → token `--shadow-float` (plan 4); brak `color-scheme` w ciemnym motywie; `font-heading` w shadcn Drawer niezdefiniowany; skrypt motywu w `body` zamiast `head`; domyślne ponowienia react-query opóźniają komunikat o niedostępnym API (~7 s) i 404 skały; brak testów 500 dla mapy/strony skały; `GradeBar` bez zabezpieczenia na >4 pasma.
+- **Niesprawdzone ręcznie:** karta na telefonie (Drawer), podkłady Ortofotomapa/OpenTopoMap z danymi, komunikat przy wyłączonym API.
