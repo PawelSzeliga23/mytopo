@@ -63,14 +63,12 @@ describe("WallViewer — 2.5D", () => {
     expect(screen.getByRole("group", { name: "Wygląd modelu" })).toBeInTheDocument();
   });
 
-  it("zarośnięta ściana startuje w 2D, ale można przełączyć na 2.5D", async () => {
+  it("zarośnięta ściana (show_3d = false) nie ma przełącznika 2.5D", () => {
     webgl.available = true;
-    wall3d.fail = false;
     imageState.current = { image: document.createElement("img"), status: "loaded" };
     render(<WallViewer wall={makeWall(1, [], { ...ready, show_3d: false })} {...props} />);
     expect(screen.getByTestId("canvas")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "2.5D" }));
-    expect(await screen.findByTestId("model")).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Widok ściany" })).not.toBeInTheDocument();
   });
 
   it("bez mapy głębi nie ma przełącznika", () => {

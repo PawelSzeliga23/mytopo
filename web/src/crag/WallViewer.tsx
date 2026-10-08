@@ -52,13 +52,15 @@ function Segmented<T extends string>({ label, value, options, onChange }: {
 }
 
 /**
- * One wall with its routes: the photo by default, the 2.5D model on request (ready depth map and WebGL available).
+ * One wall with its routes: the photo by default, the 2.5D model on request (ready depth map, rock not overgrown,
+ * WebGL available).
  * A failed photo or model shows a message and leaves the rest of the page working.
  */
 export function WallViewer({ wall, className = "", style, ...canvas }: WallViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const size = useElementSize(containerRef);
-  const can3d = Boolean(wall.depth_url) && hasWebGL();
+  // show_3d is false for walls with vegetation over more than 10% of the rock (unless switched on by hand): no 2.5D there.
+  const can3d = Boolean(wall.depth_url) && wall.show_3d && hasWebGL();
   // Every wall opens the same way, as the photo; the 2.5D model is one click away in the corner.
   const [mode, setMode] = useState<Mode>("2d");
   const [look, setLook] = useState<Look>("holo");
