@@ -1,3 +1,6 @@
+from datetime import datetime
+from typing import Any, Literal
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -120,3 +123,42 @@ class AreaOut(BaseModel):
     crags: list[CragSummary]
     center: list[float] | None
     bbox: list[float] | None
+
+
+class FieldDiffOut(BaseModel):
+    field: str
+    before: Any
+    after: Any
+
+
+class ObjectChangeOut(BaseModel):
+    kind: Literal["area", "crag", "wall", "route", "topo"]
+    id: int
+    name: str | None
+    op: Literal["created", "updated", "deleted"]
+    diffs: list[FieldDiffOut]
+    summary: str | None  # "topo" only, e.g. "zmieniono 3 linie, 7 punktów"
+
+
+class CragRef(BaseModel):
+    id: int
+    name: str
+    slug: str | None  # None once the crag is gone
+
+
+class ChangeOut(BaseModel):
+    id: int
+    author: str | None
+    comment: str | None
+    issued_at: datetime
+    is_import: bool
+    reverts_id: int | None
+    reverted_by: int | None
+    crag: CragRef | None
+    area_path: list[AreaRef]
+    objects: list[ObjectChangeOut]
+
+
+class ChangesPage(BaseModel):
+    items: list[ChangeOut]
+    next_before: int | None
