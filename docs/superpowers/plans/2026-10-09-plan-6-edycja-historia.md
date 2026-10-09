@@ -658,3 +658,15 @@ test("logowanie → zmiana wyceny → historia → cofnięcie", async ({ page })
 - [ ] **Step 3: Uruchom** `cd web; npm test; npm run e2e`, `docker compose run --rm api pytest -q`.
 - [ ] **Step 4: Commit** `test: E2E edycji i historii, konfiguracja hasła edycji`
 - [ ] **Step 5:** Dopisz „Wnioski z wykonania” na końcu tego planu (decyzje i poprawki z przeglądarki) i zaktualizuj spec, jeśli użytkownik zmienił decyzję.
+
+## Wnioski z wykonania
+
+- Sprawdzone w przeglądarce (komputer 1440×900 i telefon 390×844, motyw jasny i ciemny): logowanie, „Zmień nick” i wylogowanie; edycja skały z komentarzem; edycja, dodanie i usunięcie drogi z podświetleniem na topo; historia skały i cofnięcie z konfliktem (dwa konteksty, dwa nicki); strona „Ostatnie zmiany” (filtr „tylko usunięcia”); przesunięcie pinezki i dodanie skały; nowy sektor z trzech skał (skała z innego sektora oznaczona „przejdzie z…”) i jego cofnięcie; zamiana skały z trzema ścianami w sektor, żółta pinezka, rozstawienie, cofnięcie (z okienkiem konfliktu, bo skałę ruszono po zamianie); usunięcie skały i przywrócenie — 2D i 2.5D działają. Bez błędów MapLibre w konsoli (warstwa zaznaczonej skały i obrys „na żywo”); w trybie nowego sektora skały wewnątrz sektorów są klikalne już przy zoomie dopasowania regionu (~13,9).
+- Okienko logowania (także „Zmień nick”) zamyka się i strona zostaje klikalna; po zalogowaniu okienko znika po ok. 1–2 s w trybie dev (renderowanie strony skały), w produkcji do sprawdzenia.
+- Telefon: pasek górny mieści ikonę „Ostatnie zmiany”, nick i motyw; panel drogi jako dolna szuflada przewija się, „Zapisz/Anuluj/Usuń” zostają przypięte; okienko obszaru otwiera się nad szufladą karty (po zapisie karta się zamyka — dane odświeżone).
+- Nie sprawdzone (brak urządzenia): klawiatura ekranowa nakrywająca przypięte przyciski szuflady, przeciąganie pinezki palcem.
+- E2E: `data-testid` istniały; wiersz drogi to `<li>` z przyciskiem „Edytuj drogę …” (rodzeństwo przycisku wiersza), więc test wybiera go po nazwie drogi (kolejność listy może się zmienić po edycji wyceny), a wycenę sprawdza `toContainText` (plakietka ma też wycenę francuską, np. „VI.5 7c”). Test zakłada bazę, w której pierwsza droga skały nie ma już wyceny „VI.5”.
+- `.env` (lokalny, poza Gitem) dostał `EDIT_PASSWORD=e2e-haslo` i losowy `SECRET_KEY`; `docker-compose.yml` przekazuje obie zmienne do `api`.
+- Rozmiar: główny plik JS 1 552 → 1 664 kB (+112 kB, gzip +34 kB), `CragPage` +19 kB; cel „~60 kB” przekroczony w surowych kB (sesja, logowanie, menu, okienka edycji obszaru/skały/sektora są w głównej paczce). Do zrobienia: leniwe `AddCragDialog`, `NewSectorDialog`, `AreaEditDialog`.
+- Do poprawienia później (kosmetyka): wpis historii zamiany/nowego sektora pokazuje zmianę obszaru jako liczby („obszar 9 → 139”) zamiast nazw; wpis usunięcia skały ma przycisk „↶ Cofnij”, a usunięcia drogi „↶ Przywróć”; w konsoli 401 z `/api/auth/me` dla niezalogowanych; `<input type=password>` bez pola nazwy użytkownika (komunikat Chrome); warunek `E2E` zostawia po nieudanym przebiegu zmienioną wycenę (cofnąć z „Ostatnich zmian”).
+- Spec bez zmian (żadnej decyzji użytkownika nie zmieniono).
