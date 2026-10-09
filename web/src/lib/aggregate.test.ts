@@ -11,7 +11,7 @@ const crag = (
   range: [string, number, string, number] | null = null,
 ): CragProps => ({
   id, name: `C${id}`, slug: `c${id}`, area_id, area_kind, in_sector: area_kind === "sektor", route_count: 0, grade_bands,
-  grade_min: range?.[0] ?? null, grade_min_sort: range?.[1] ?? null, grade_max: range?.[2] ?? null, grade_max_sort: range?.[3] ?? null,
+  grade_min: range?.[0] ?? null, grade_min_sort: range?.[1] ?? null, grade_max: range?.[2] ?? null, grade_max_sort: range?.[3] ?? null, needs_location: false,
 });
 
 describe("aggregateBands", () => {

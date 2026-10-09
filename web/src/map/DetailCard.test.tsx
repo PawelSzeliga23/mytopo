@@ -22,7 +22,7 @@ const region: AreaProps = {
 };
 const crag: CragProps = {
   id: 7, name: "Żabi Koń", slug: "zabi-kon", area_id: 102, area_kind: "sektor", in_sector: true,
-  route_count: 1, grade_bands: [1, 0, 0, 0], grade_min: "V", grade_min_sort: 80, grade_max: "VI.3", grade_max_sort: 160,
+  route_count: 1, grade_bands: [1, 0, 0, 0], grade_min: "V", grade_min_sort: 80, grade_max: "VI.3", grade_max_sort: 160, needs_location: false,
 };
 const route = (id: number, number: number, name: string): RouteOut => ({
   id, number, name, grade: "VI.1", grade_fr: "6b", grade_sort: 120, length_m: null, protection: null,

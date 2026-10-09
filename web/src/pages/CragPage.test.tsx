@@ -5,6 +5,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WallViewerProps } from "@/crag/WallViewer";
 import type { CragDetail } from "@/lib/api";
+import { SessionProvider } from "@/lib/session";
 import { ThemeProvider } from "@/lib/theme";
 import CragPage from "@/pages/CragPage";
 import { ln, makeCrag, makeRoute, makeWall, pt } from "@/test/fixtures";
@@ -41,7 +42,8 @@ const crag = makeCrag([left, right], routes);
 
 function renderAt(data: CragDetail | Response, entries = ["/skaly/brzuchata-turniczka"]) {
   const response = data instanceof Response ? data : new Response(JSON.stringify(data));
-  vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(response)));
+  // /api/auth/me answers 401 (not logged in); everything else gets the crag.
+  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(url.includes("/auth/me") ? new Response("{}", { status: 401 }) : response.clone())));
   const router = createMemoryRouter(
     [
       { path: "/", element: <p>Mapa</p> },
@@ -53,7 +55,9 @@ function renderAt(data: CragDetail | Response, entries = ["/skaly/brzuchata-turn
   render(
     <ThemeProvider>
       <QueryClientProvider client={client}>
-        <RouterProvider router={router} />
+        <SessionProvider>
+          <RouterProvider router={router} />
+        </SessionProvider>
       </QueryClientProvider>
     </ThemeProvider>,
   );

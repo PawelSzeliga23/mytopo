@@ -1,5 +1,6 @@
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { UserMenu } from "@/components/UserMenu";
 
 const floating = "rounded-[10px] bg-background shadow-float";
 
@@ -14,6 +15,7 @@ export function TopBar() {
         title="Wyszukiwarka w przygotowaniu"
         className="min-w-0 flex-1 rounded-md border border-input bg-card px-3 py-1.5 text-sm placeholder:text-muted-foreground disabled:cursor-not-allowed"
       />
+      <UserMenu />
       <ThemeToggle />
     </header>
   );

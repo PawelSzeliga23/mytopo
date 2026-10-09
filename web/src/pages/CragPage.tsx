@@ -3,6 +3,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { UserMenu } from "@/components/UserMenu";
 import { CragInfo } from "@/crag/CragInfo";
 import { RouteList } from "@/crag/RouteList";
 import { routeRows, type RouteRow } from "@/crag/topo";
@@ -60,7 +61,10 @@ export default function CragPage() {
         <button type="button" onClick={backToMap} aria-label="Wróć do mapy">
           <Logo />
         </button>
-        <ThemeToggle />
+        <div className="flex items-center gap-2">
+          <UserMenu />
+          <ThemeToggle />
+        </div>
       </header>
       {isPending && <p className="text-muted-foreground">Wczytywanie…</p>}
       {error && <p role="alert">{error instanceof ApiError && error.status === 404 ? "Nie znaleziono skały" : error.message}</p>}

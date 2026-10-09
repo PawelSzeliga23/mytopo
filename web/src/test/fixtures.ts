@@ -36,7 +36,7 @@ export function makeCrag(walls: WallOut[], routes: RouteOut[], extra: Partial<Cr
     ],
     lng: 19.764721, lat: 50.166141, rock_type: "wapień", height_min: 10, height_max: 10, aspects: ["N"],
     formations: [], approach_minutes: 5, child_friendly: true, surroundings: null, description: null,
-    approach_description: null, source: "portalgorski", source_url: "https://topo.portalgorski.pl/skala,365",
+    approach_description: null, needs_location: false, source: "portalgorski", source_url: "https://topo.portalgorski.pl/skala,365",
     walls, routes, ...extra,
   };
 }
