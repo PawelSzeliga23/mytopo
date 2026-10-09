@@ -29,7 +29,9 @@ export function draftLabels(draft: Draft): Map<string, string> {
     .forEach((root, index) => {
       const number = String(index + 1);
       labels.set(root.key, number);
-      (groups.get(root.key) ?? []).filter((line) => line.key !== root.key).forEach((line, i) => labels.set(line.key, `${number}${letter(i)}`));
+      (groups.get(root.key) ?? [])
+        .filter((line) => line.key !== root.key)
+        .forEach((line, i) => labels.set(line.key, `${number}${letter(i)}`));
     });
   return labels;
 }

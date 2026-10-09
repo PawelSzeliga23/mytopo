@@ -31,6 +31,14 @@ let counter = 0;
 /** Key for an object added in the editor; never collides with `l{id}` / `p{id}` keys of saved ones. */
 export const newKey = () => `n${++counter}`;
 
+function maxNewKey(draft: Draft): number {
+  const keys = [
+    ...draft.newRoutes.map((route) => route.key),
+    ...draft.lines.flatMap((line) => [line.key, ...line.points.map((point) => point.key)]),
+  ];
+  return keys.reduce((max, key) => (/^n\d+$/.test(key) ? Math.max(max, Number(key.slice(1))) : max), 0);
+}
+
 const UNDO_LIMIT = 100;
 const EMPTY: Draft = { wallId: 0, baseVersion: 0, lines: [], newRoutes: [] };
 const clamp = (value: number) => Math.min(1, Math.max(0, value));
@@ -53,7 +61,8 @@ export const useEditor = create<EditorState>()(
       selectedPointKey: null,
 
       load(draft, image) {
-        counter = 0;
+        // Continue after the highest key of a restored draft, so new objects never reuse one.
+        counter = maxNewKey(draft);
         set({ draft, image, selectedLineKey: null, selectedPointKey: null });
         useEditor.temporal.getState().clear();
       },
@@ -96,7 +105,15 @@ export const useEditor = create<EditorState>()(
         set({
           draft: mapLine(draft, lineKey, (line) => ({
             ...line,
-            points: [...line.points, { key, id: null, ...at, kind: line.points.length === 0 ? "start" : "ring" }],
+            points: [
+              ...line.points,
+              {
+                key,
+                id: null,
+                ...at,
+                kind: line.points.length === 0 ? "start" : "ring",
+              },
+            ],
           })),
           selectedLineKey: lineKey,
           selectedPointKey: key,
@@ -110,7 +127,12 @@ export const useEditor = create<EditorState>()(
         set({
           draft: mapLine(draft, lineKey, (line) => {
             const points = [...line.points];
-            points.splice(afterIndex + 1, 0, { key, id: null, ...clampAt(raw), kind: "przelot" });
+            points.splice(afterIndex + 1, 0, {
+              key,
+              id: null,
+              ...clampAt(raw),
+              kind: "przelot",
+            });
             return { ...line, points };
           }),
           selectedLineKey: lineKey,
@@ -121,9 +143,15 @@ export const useEditor = create<EditorState>()(
 
       deletePoint(lineKey, pointKey) {
         const { draft } = get();
-        const lines = mapLine(draft, lineKey, (line) => ({ ...line, points: line.points.filter((p) => p.key !== pointKey) })).lines;
+        const lines = mapLine(draft, lineKey, (line) => ({
+          ...line,
+          points: line.points.filter((p) => p.key !== pointKey),
+        })).lines;
         set({
-          draft: { ...draft, lines: detachFrom(lines, (parent) => parent.lineKey === lineKey && parent.pointKey === pointKey) },
+          draft: {
+            ...draft,
+            lines: detachFrom(lines, (parent) => parent.lineKey === lineKey && parent.pointKey === pointKey),
+          },
           selectedPointKey: null,
         });
       },
@@ -141,7 +169,10 @@ export const useEditor = create<EditorState>()(
         const { draft } = get();
         const key = newKey();
         set({
-          draft: { ...draft, lines: [...draft.lines, { key, id: null, route, parent: null, points: [] }] },
+          draft: {
+            ...draft,
+            lines: [...draft.lines, { key, id: null, route, parent: null, points: [] }],
+          },
           selectedLineKey: key,
           selectedPointKey: null,
         });
@@ -154,9 +185,22 @@ export const useEditor = create<EditorState>()(
         const branch = parentLine?.points.find((point) => point.key === parent.pointKey);
         const key = newKey();
         // A variant's own points start at the branch point, as imported variants do (linePath drops the duplicate).
-        const points = branch ? [{ key: newKey(), id: null, x: branch.x, y: branch.y, kind: "przelot" as const }] : [];
+        const points = branch
+          ? [
+              {
+                key: newKey(),
+                id: null,
+                x: branch.x,
+                y: branch.y,
+                kind: "przelot" as const,
+              },
+            ]
+          : [];
         set({
-          draft: { ...draft, lines: [...draft.lines, { key, id: null, route, parent, points }] },
+          draft: {
+            ...draft,
+            lines: [...draft.lines, { key, id: null, route, parent, points }],
+          },
           selectedLineKey: key,
           selectedPointKey: null,
         });
@@ -166,12 +210,19 @@ export const useEditor = create<EditorState>()(
       addRoute(name, grade) {
         const { draft } = get();
         const key = newKey();
-        set({ draft: { ...draft, newRoutes: [...draft.newRoutes, { key, name, grade }] } });
+        set({
+          draft: {
+            ...draft,
+            newRoutes: [...draft.newRoutes, { key, name, grade }],
+          },
+        });
         return key;
       },
 
       setRoute(lineKey, route) {
-        set({ draft: mapLine(get().draft, lineKey, (line) => ({ ...line, route })) });
+        set({
+          draft: mapLine(get().draft, lineKey, (line) => ({ ...line, route })),
+        });
       },
 
       moveLine(lineKey, delta) {
@@ -188,7 +239,10 @@ export const useEditor = create<EditorState>()(
         const { draft } = get();
         const lines = draft.lines.filter((line) => line.key !== lineKey);
         set({
-          draft: { ...draft, lines: detachFrom(lines, (parent) => parent.lineKey === lineKey) },
+          draft: {
+            ...draft,
+            lines: detachFrom(lines, (parent) => parent.lineKey === lineKey),
+          },
           selectedLineKey: null,
           selectedPointKey: null,
         });

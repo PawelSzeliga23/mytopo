@@ -1,32 +1,10 @@
 import type Konva from "konva";
 import { useEffect, useRef, useState } from "react";
-import {
-  Circle,
-  Group,
-  Image as KonvaImage,
-  Layer,
-  Line,
-  Stage,
-  Text,
-} from "react-konva";
+import { Circle, Group, Image as KonvaImage, Layer, Line, Stage, Text } from "react-konva";
 import { isDrag } from "@/crag/gesture";
-import {
-  clampView,
-  IDENTITY,
-  panBy,
-  toScreen,
-  zoomAt,
-  type Point,
-  type Size,
-  type View,
-} from "@/crag/view";
+import { clampView, IDENTITY, panBy, toScreen, zoomAt, type Point, type Size, type View } from "@/crag/view";
 import { Mark } from "@/crag/WallCanvas";
-import {
-  HANDLE_RADIUS,
-  LINE_HIT,
-  nearestSegment,
-  toPhoto,
-} from "@/editor/geometry";
+import { HANDLE_RADIUS, LINE_HIT, nearestSegment, toPhoto } from "@/editor/geometry";
 import { draftLabels } from "@/editor/labels";
 import { useEditor } from "@/editor/store";
 import type { DraftLine, DraftPoint } from "@/editor/types";
@@ -77,14 +55,7 @@ const center = (points: Point[]) => ({
 });
 const spread = ([a, b]: Point[]) => Math.hypot(a.x - b.x, a.y - b.y);
 
-export function EditorCanvas({
-  image,
-  routes,
-  size,
-  tool,
-  detach,
-  onVariantStarted,
-}: EditorCanvasProps) {
+export function EditorCanvas({ image, routes, size, tool, detach, onVariantStarted }: EditorCanvasProps) {
   const { theme } = useTheme();
   const draft = useEditor((s) => s.draft);
   const selectedLineKey = useEditor((s) => s.selectedLineKey);
@@ -96,13 +67,7 @@ export function EditorCanvas({
 
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
-      if (
-        event.code === "Space" &&
-        !(
-          event.target instanceof HTMLInputElement ||
-          event.target instanceof HTMLTextAreaElement
-        )
-      )
+      if (event.code === "Space" && !(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement))
         spaceDown.current = true;
     };
     const up = (event: KeyboardEvent) => {
@@ -125,28 +90,18 @@ export function EditorCanvas({
   const labels = draftLabels(draft);
 
   const colorOf = (line: DraftLine) => {
-    if (line.route === null || !("routeId" in line.route))
-      return UNGRADED_COLOR[theme];
+    if (line.route === null || !("routeId" in line.route)) return UNGRADED_COLOR[theme];
     return bandColor(routes.get(line.route.routeId)?.grade_sort ?? null, theme);
   };
 
   // The point being dragged is drawn at the pointer until the drag ends (then one store action = one undo step).
-  const dragged =
-    gesture?.kind === "handle" && isDrag(gesture.travel) ? gesture : null;
+  const dragged = gesture?.kind === "handle" && isDrag(gesture.travel) ? gesture : null;
   const pointAt = (line: DraftLine, point: DraftPoint): Point => {
-    if (
-      dragged &&
-      dragged.handle.lineKey === line.key &&
-      dragged.handle.pointKey === point.key
-    )
-      return dragged.at;
+    if (dragged && dragged.handle.lineKey === line.key && dragged.handle.pointKey === point.key) return dragged.at;
     return screen(point);
   };
 
-  const handleLines =
-    tool === "variant"
-      ? draft.lines
-      : draft.lines.filter((line) => line.key === selectedLineKey);
+  const handleLines = tool === "variant" ? draft.lines : draft.lines.filter((line) => line.key === selectedLineKey);
   const handles: Handle[] = handleLines.flatMap((line) =>
     line.points.map((point) => ({
       lineKey: line.key,
@@ -174,10 +129,7 @@ export function EditorCanvas({
     let best: Handle | null = null;
     let bestDistance = Infinity;
     for (const handle of handles) {
-      const distance = Math.hypot(
-        handle.screen.x - at.x,
-        handle.screen.y - at.y,
-      );
+      const distance = Math.hypot(handle.screen.x - at.x, handle.screen.y - at.y);
       if (distance <= radius && distance < bestDistance) {
         best = handle;
         bestDistance = distance;
@@ -228,35 +180,24 @@ export function EditorCanvas({
     if (gesture.kind === "pinch" && points.length > 1) {
       const mid = center(points);
       const ratio = spread(points) / gesture.spread;
-      setView((current) =>
-        zoomAt(
-          panBy(current, mid.x - gesture.last.x, mid.y - gesture.last.y, size),
-          mid,
-          ratio,
-          size,
-        ),
-      );
+      setView((current) => zoomAt(panBy(current, mid.x - gesture.last.x, mid.y - gesture.last.y, size), mid, ratio, size));
       setGesture({ kind: "pinch", last: mid, spread: spread(points) });
     } else if (gesture.kind === "pan") {
       const at = points[0];
-      setView((current) =>
-        panBy(current, at.x - gesture.last.x, at.y - gesture.last.y, size),
-      );
+      setView((current) => panBy(current, at.x - gesture.last.x, at.y - gesture.last.y, size));
       setGesture({ kind: "pan", last: at });
     } else if (gesture.kind === "handle") {
       const at = points[0];
       setGesture({
         ...gesture,
         at,
-        travel:
-          gesture.travel + Math.hypot(at.x - gesture.at.x, at.y - gesture.at.y),
+        travel: gesture.travel + Math.hypot(at.x - gesture.at.x, at.y - gesture.at.y),
       });
     } else if (gesture.kind === "tap") {
       const at = points[0];
       const travel = Math.hypot(at.x - gesture.start.x, at.y - gesture.start.y);
       // A mouse dragging the photo pans it; one finger never pans (it edits), two fingers do.
-      if (!gesture.touch && isDrag(travel))
-        setGesture({ kind: "pan", last: at });
+      if (!gesture.touch && isDrag(travel)) setGesture({ kind: "pan", last: at });
       else setGesture({ ...gesture, travel });
     }
   }
@@ -268,12 +209,7 @@ export function EditorCanvas({
     const store = useEditor.getState();
     if (current.kind === "handle") {
       if (isDrag(current.travel))
-        store.movePoint(
-          current.handle.lineKey,
-          current.handle.pointKey,
-          photo(current.at),
-          detach || current.alt,
-        );
+        store.movePoint(current.handle.lineKey, current.handle.pointKey, photo(current.at), detach || current.alt);
       return;
     }
     if (current.kind !== "tap" || isDrag(current.travel)) return;
@@ -285,13 +221,8 @@ export function EditorCanvas({
     if (tool === "variant") {
       const handle = handleAt(at, touch);
       if (!handle) return;
-      const parentLine = draft.lines.find(
-        (line) => line.key === handle.lineKey,
-      );
-      store.newVariant(
-        { lineKey: handle.lineKey, pointKey: handle.pointKey },
-        parentLine?.route ?? null,
-      );
+      const parentLine = draft.lines.find((line) => line.key === handle.lineKey);
+      store.newVariant({ lineKey: handle.lineKey, pointKey: handle.pointKey }, parentLine?.route ?? null);
       onVariantStarted();
       return;
     }
@@ -311,8 +242,7 @@ export function EditorCanvas({
     let best: { key: string; distance: number } | null = null;
     for (const line of draft.lines) {
       const hit = nearestSegment(line.points.map(screen), at, LINE_HIT);
-      if (hit && (!best || hit.distance < best.distance))
-        best = { key: line.key, distance: hit.distance };
+      if (hit && (!best || hit.distance < best.distance)) best = { key: line.key, distance: hit.distance };
     }
     store.select(best?.key ?? null, null);
   }
@@ -334,8 +264,7 @@ export function EditorCanvas({
         const { x, y } = pointAt(line, point);
         return [x, y];
       });
-      const opacity =
-        !emphasize || selected || selectedLineKey === null ? 1 : 0.45;
+      const opacity = !emphasize || selected || selectedLineKey === null ? 1 : 0.45;
       const first = line.points[0] ? pointAt(line, line.points[0]) : null;
       return (
         <Group key={line.key} opacity={opacity} listening={false}>
@@ -347,32 +276,14 @@ export function EditorCanvas({
             lineCap="round"
             lineJoin="round"
           />
-          <Line
-            points={flat}
-            stroke={color}
-            strokeWidth={selected ? 6 : 3}
-            tension={0.3}
-            lineCap="round"
-            lineJoin="round"
-          />
+          <Line points={flat} stroke={color} strokeWidth={selected ? 6 : 3} tension={0.3} lineCap="round" lineJoin="round" />
           {!selected &&
             line.points
               .filter((point) => point.kind !== "przelot")
-              .map((point) => (
-                <Mark
-                  key={point.key}
-                  mark={{ ...pointAt(line, point), kind: point.kind }}
-                  color={color}
-                />
-              ))}
+              .map((point) => <Mark key={point.key} mark={{ ...pointAt(line, point), kind: point.kind }} color={color} />)}
           {first && (
             <Group x={first.x + (line.parent ? 16 : 0)} y={first.y + 16}>
-              <Circle
-                radius={11}
-                fill={color}
-                stroke="#FFFFFF"
-                strokeWidth={1.5}
-              />
+              <Circle radius={11} fill={color} stroke="#FFFFFF" strokeWidth={1.5} />
               <Text
                 text={labels.get(line.key) ?? ""}
                 fontFamily="IBM Plex Sans"
@@ -393,19 +304,11 @@ export function EditorCanvas({
     });
 
   const touchHandles = gesture?.kind === "handle" ? gesture.touch : false;
-  const radius =
-    touchHandles || window.matchMedia?.("(pointer: coarse)").matches
-      ? HANDLE_RADIUS.touch
-      : HANDLE_RADIUS.mouse;
+  const radius = touchHandles || window.matchMedia?.("(pointer: coarse)").matches ? HANDLE_RADIUS.touch : HANDLE_RADIUS.mouse;
   const loupe = dragged?.touch ? dragged.at : null;
-  const loupeCenter = loupe
-    ? { x: loupe.x, y: Math.max(LOUPE.radius, loupe.y - LOUPE.lift) }
-    : null;
+  const loupeCenter = loupe ? { x: loupe.x, y: Math.max(LOUPE.radius, loupe.y - LOUPE.lift) } : null;
 
-  const zoomButton = (factor: number) =>
-    setView((current) =>
-      zoomAt(current, { x: size.width / 2, y: size.height / 2 }, factor, size),
-    );
+  const zoomButton = (factor: number) => setView((current) => zoomAt(current, { x: size.width / 2, y: size.height / 2 }, factor, size));
 
   return (
     <>
@@ -419,15 +322,7 @@ export function EditorCanvas({
         onWheel={(event) => {
           event.evt.preventDefault();
           const pointer = event.target.getStage()?.getPointerPosition();
-          if (pointer)
-            setView((current) =>
-              zoomAt(
-                current,
-                pointer,
-                event.evt.deltaY < 0 ? WHEEL_STEP : 1 / WHEEL_STEP,
-                size,
-              ),
-            );
+          if (pointer) setView((current) => zoomAt(current, pointer, event.evt.deltaY < 0 ? WHEEL_STEP : 1 / WHEEL_STEP, size));
         }}
         onMouseDown={start}
         onMouseMove={move}
@@ -445,9 +340,7 @@ export function EditorCanvas({
             const line = draft.lines.find((l) => l.key === handle.lineKey)!;
             const point = line.points.find((p) => p.key === handle.pointKey)!;
             const at = pointAt(line, point);
-            const active =
-              handle.pointKey === selectedPointKey &&
-              handle.lineKey === selectedLineKey;
+            const active = handle.pointKey === selectedPointKey && handle.lineKey === selectedLineKey;
             const hollow = point.kind === "przelot";
             return (
               <Circle
@@ -467,14 +360,7 @@ export function EditorCanvas({
           <Layer listening={false}>
             <Group
               clipFunc={(ctx) => {
-                ctx.arc(
-                  loupeCenter.x,
-                  loupeCenter.y,
-                  LOUPE.radius,
-                  0,
-                  Math.PI * 2,
-                  false,
-                );
+                ctx.arc(loupeCenter.x, loupeCenter.y, LOUPE.radius, 0, Math.PI * 2, false);
               }}
             >
               <Group
@@ -487,34 +373,9 @@ export function EditorCanvas({
                 {drawLines(false)}
               </Group>
             </Group>
-            <Circle
-              x={loupeCenter.x}
-              y={loupeCenter.y}
-              radius={LOUPE.radius}
-              stroke="#FFFFFF"
-              strokeWidth={3}
-              shadowBlur={6}
-            />
-            <Line
-              points={[
-                loupeCenter.x - 10,
-                loupeCenter.y,
-                loupeCenter.x + 10,
-                loupeCenter.y,
-              ]}
-              stroke="#C2541B"
-              strokeWidth={2}
-            />
-            <Line
-              points={[
-                loupeCenter.x,
-                loupeCenter.y - 10,
-                loupeCenter.x,
-                loupeCenter.y + 10,
-              ]}
-              stroke="#C2541B"
-              strokeWidth={2}
-            />
+            <Circle x={loupeCenter.x} y={loupeCenter.y} radius={LOUPE.radius} stroke="#FFFFFF" strokeWidth={3} shadowBlur={6} />
+            <Line points={[loupeCenter.x - 10, loupeCenter.y, loupeCenter.x + 10, loupeCenter.y]} stroke="#C2541B" strokeWidth={2} />
+            <Line points={[loupeCenter.x, loupeCenter.y - 10, loupeCenter.x, loupeCenter.y + 10]} stroke="#C2541B" strokeWidth={2} />
           </Layer>
         )}
       </Stage>

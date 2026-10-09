@@ -14,11 +14,20 @@ export function draftFromWall(wall: WallOut): Draft {
       route: line.route_id === null ? null : { routeId: line.route_id },
       parent:
         line.parent_line_id !== null && line.parent_point_id !== null
-          ? { lineKey: `l${line.parent_line_id}`, pointKey: `p${line.parent_point_id}` }
+          ? {
+              lineKey: `l${line.parent_line_id}`,
+              pointKey: `p${line.parent_point_id}`,
+            }
           : null,
       points: [...line.points]
         .sort((a, b) => a.sort_order - b.sort_order || a.id - b.id)
-        .map((point) => ({ key: `p${point.id}`, id: point.id, x: point.x, y: point.y, kind: point.kind })),
+        .map((point) => ({
+          key: `p${point.id}`,
+          id: point.id,
+          x: point.x,
+          y: point.y,
+          kind: point.kind,
+        })),
     })),
   };
 }
@@ -45,13 +54,23 @@ export function toSaveBody(draft: Draft, comment: string | null): SaveLinesBody 
   return {
     version: draft.baseVersion,
     comment,
-    new_routes: draft.newRoutes.map((route) => ({ ref: route.key, name: route.name, grade: route.grade })),
+    new_routes: draft.newRoutes.map((route) => ({
+      ref: route.key,
+      name: route.name,
+      grade: route.grade,
+    })),
     lines: draft.lines.map((line, index) => ({
       ...idOrRef(line),
       ...routeOf(line.route),
       sort_order: index,
       parent: parentOf(draft, line),
-      points: line.points.map((point, order) => ({ ...idOrRef(point), sort_order: order, x: point.x, y: point.y, kind: point.kind })),
+      points: line.points.map((point, order) => ({
+        ...idOrRef(point),
+        sort_order: order,
+        x: point.x,
+        y: point.y,
+        kind: point.kind,
+      })),
     })),
   };
 }
@@ -67,7 +86,11 @@ export function applySaved(draft: Draft, result: SaveLinesResult): Draft {
     ...draft,
     baseVersion: result.version,
     newRoutes: draft.newRoutes.filter((r) => ids[r.key] === undefined),
-    lines: draft.lines.map((line) => ({ ...withId(line), route: route(line.route), points: line.points.map(withId) })),
+    lines: draft.lines.map((line) => ({
+      ...withId(line),
+      route: route(line.route),
+      points: line.points.map(withId),
+    })),
   };
 }
 

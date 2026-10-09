@@ -11,12 +11,24 @@ function makeDraft(): Draft {
     newRoutes: [],
     lines: [
       {
-        key: "l1", id: 1, route: { routeId: 1 }, parent: null,
-        points: [{ key: "p1", id: 1, x: 0.1, y: 0.9, kind: "start" }, { key: "p2", id: 2, x: 0.5, y: 0.2, kind: "stanowisko" }],
+        key: "l1",
+        id: 1,
+        route: { routeId: 1 },
+        parent: null,
+        points: [
+          { key: "p1", id: 1, x: 0.1, y: 0.9, kind: "start" },
+          { key: "p2", id: 2, x: 0.5, y: 0.2, kind: "stanowisko" },
+        ],
       },
       {
-        key: "l2", id: 2, route: { routeId: 2 }, parent: null,
-        points: [{ key: "p3", id: 3, x: 0.3, y: 0.9, kind: "start" }, { key: "p4", id: 4, x: 0.5, y: 0.2, kind: "stanowisko" }],
+        key: "l2",
+        id: 2,
+        route: { routeId: 2 },
+        parent: null,
+        points: [
+          { key: "p3", id: 3, x: 0.3, y: 0.9, kind: "start" },
+          { key: "p4", id: 4, x: 0.5, y: 0.2, kind: "stanowisko" },
+        ],
       },
     ],
   };
@@ -34,7 +46,10 @@ describe("editor store", () => {
     const key = state().newLine({ routeId: 9 });
     state().appendPoint(key, { x: 0.8, y: 0.9 });
     state().appendPoint(key, { x: 0.5002, y: 0.2 });
-    expect(line(key).points.map((p) => [p.kind, p.x, p.y])).toEqual([["start", 0.8, 0.9], ["ring", 0.5, 0.2]]);
+    expect(line(key).points.map((p) => [p.kind, p.x, p.y])).toEqual([
+      ["start", 0.8, 0.9],
+      ["ring", 0.5, 0.2],
+    ]);
     expect(state().selectedLineKey).toBe(key);
   });
 
@@ -117,7 +132,10 @@ describe("editor store", () => {
     const key = state().newLine({ routeId: 9 });
     state().appendPoint(key, { x: 0.8, y: 0.9 });
     const steps = temporal().pastStates.length;
-    const withId = (draft: Draft): Draft => ({ ...draft, lines: draft.lines.map((l) => (l.key === key ? { ...l, id: 50 } : l)) });
+    const withId = (draft: Draft): Draft => ({
+      ...draft,
+      lines: draft.lines.map((l) => (l.key === key ? { ...l, id: 50 } : l)),
+    });
     state().rebase(withId);
     expect(line(key).id).toBe(50);
     expect(temporal().pastStates.length).toBe(steps);

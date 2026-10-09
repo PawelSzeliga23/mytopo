@@ -57,6 +57,9 @@ export function CragMenu({ crag, wall, onHistory }: Props) {
           {wall && (
             <>
               <DropdownMenuSeparator />
+              {wall.image_url && (
+                <DropdownMenuItem onSelect={() => navigate(`/skaly/${crag.slug}/topo/${wall.id}`)}>Edytuj topo</DropdownMenuItem>
+              )}
               <DropdownMenuItem onSelect={() => setOpen("wall")}>Ściana: nazwa i opis</DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setOpen("delete-wall")}>Usuń ścianę</DropdownMenuItem>
             </>
