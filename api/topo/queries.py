@@ -16,7 +16,7 @@ def crag_summaries(session: Session, area_id: int | None = None) -> list[dict[st
         params["area_id"] = area_id
     rows = session.execute(
         text(f"""
-            SELECT c.id, c.name, c.slug, c.area_id, a.kind = 'sektor' AS in_sector, a.kind AS area_kind,
+            SELECT c.id, c.name, c.slug, c.area_id, a.kind = 'sektor' AS in_sector, a.kind AS area_kind, c.needs_location,
                    ST_X(c.location) AS lng, ST_Y(c.location) AS lat,
                    count(r.id)::int AS route_count,
                    count(r.id) FILTER (WHERE r.grade_sort < :b1)::int AS band0,
@@ -44,6 +44,7 @@ def crag_summaries(session: Session, area_id: int | None = None) -> list[dict[st
             "area_id": r["area_id"],
             "in_sector": r["in_sector"],
             "area_kind": r["area_kind"],
+            "needs_location": r["needs_location"],
             "lng": r["lng"],
             "lat": r["lat"],
             "route_count": r["route_count"],

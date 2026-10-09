@@ -1,4 +1,5 @@
 import logging
+from typing import NoReturn
 
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
@@ -21,6 +22,10 @@ class ApiError(Exception):
 
 def not_found(what: str) -> ApiError:
     return ApiError(404, "not_found", f"Nie znaleziono: {what}")
+
+
+def raise_not_found(what: str) -> NoReturn:
+    raise not_found(what)
 
 
 def install_error_handlers(app: FastAPI) -> None:

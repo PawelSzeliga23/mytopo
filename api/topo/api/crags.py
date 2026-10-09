@@ -1,15 +1,21 @@
-from fastapi import APIRouter, Depends
+from typing import Annotated, Any
+
+from fastapi import APIRouter, Depends, Query, Response
 from geoalchemy2.shape import to_shape
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from topo.api.common import area_path, media_url
-from topo.api.errors import not_found
-from topo.db import get_session
+from topo.api.deps import current_editor, start_change
+from topo.api.errors import ApiError, not_found, raise_not_found
+from topo.db import get_session, refresh_area_geom
 from topo.depth import SEGMENTS_FILE, wants_3d
+from topo.editing import apply_fields, apply_grade, area_kind_ok, delete_crag, location_from, location_of
 from topo.grades import to_french
-from topo.models import Crag, Route, RouteLine, Wall
+from topo.models import Area, Crag, Route, RouteLine, Wall
 from topo.schemas import CragOut, LineOut, RouteOut, WallOut
+from topo.schemas_edit import CragCreate, CragPatch, DeleteBody, RouteCreate
+from topo.slugs import unique_slug
 
 router = APIRouter(tags=["crags"])
 
@@ -87,6 +93,95 @@ def get_crag(slug: str, session: Session = Depends(get_session)) -> CragOut:
         approach_description=crag.approach_description,
         source=crag.source,
         source_url=crag.source_url,
+        needs_location=crag.needs_location,
         walls=[_wall_out(wall) for wall in crag.walls],
         routes=[_route_out(route) for route in crag.routes],
     )
+
+
+def _check_area(session: Session, area_id: int) -> None:
+    area = session.get(Area, area_id)
+    if area is None or not area_kind_ok(area):
+        raise ApiError(422, "invalid_area", "Skała może należeć tylko do regionu albo sektora")
+
+
+@router.post("", status_code=201)
+def create_crag(
+    body: CragCreate, nick: str = Depends(current_editor), session: Session = Depends(get_session)
+) -> dict[str, Any]:
+    location = location_from(body.location)
+    _check_area(session, body.area_id)
+    start_change(session, nick, body.comment)
+    crag = Crag(
+        name=body.name, area_id=body.area_id, slug=unique_slug(session, Crag, body.name), location=location,
+        source="manual",
+    )
+    session.add(crag)
+    session.flush()
+    refresh_area_geom(session)
+    session.commit()
+    return {"id": crag.id, "slug": crag.slug}
+
+
+@router.patch("/{crag_id:int}")
+def patch_crag(
+    crag_id: int, body: CragPatch, nick: str = Depends(current_editor), session: Session = Depends(get_session)
+) -> dict[str, Any]:
+    crag = session.get(Crag, crag_id) or raise_not_found("skała")
+    data = body.model_dump(exclude_unset=True)
+    start_change(session, nick, data.pop("comment", None))
+    if "area_id" in data and data["area_id"] != crag.area_id:
+        _check_area(session, data["area_id"])
+    else:
+        data.pop("area_id", None)
+    changed: set[str] = set()
+    if "location" in data:
+        new = data.pop("location")
+        point = location_from(new)
+        if location_of(crag) != [round(v, 7) for v in new]:
+            crag.location = point
+            changed.add("location")
+        if crag.needs_location:  # an explicit location, even an unchanged one, confirms the position
+            crag.needs_location = False
+            changed.add("location")
+    changed |= apply_fields(crag, data)
+    if not changed:
+        session.rollback()
+        return {"id": crag_id, "slug": crag.slug, "changed": []}
+    if changed & {"location", "area_id"}:
+        session.flush()
+        refresh_area_geom(session)
+    session.commit()
+    return {"id": crag.id, "slug": crag.slug, "changed": sorted(changed)}
+
+
+@router.delete("/{crag_id:int}", status_code=204)
+def remove_crag(
+    crag_id: int,
+    comment: Annotated[str | None, Query(max_length=500)] = None,
+    nick: str = Depends(current_editor),
+    session: Session = Depends(get_session),
+) -> Response:
+    crag = session.get(Crag, crag_id) or raise_not_found("skała")
+    start_change(session, nick, DeleteBody(comment=comment).comment)
+    delete_crag(session, crag)
+    session.flush()
+    refresh_area_geom(session)
+    session.commit()
+    return Response(status_code=204)
+
+
+@router.post("/{crag_id:int}/routes", status_code=201)
+def create_route(
+    crag_id: int, body: RouteCreate, nick: str = Depends(current_editor), session: Session = Depends(get_session)
+) -> dict[str, Any]:
+    crag = session.get(Crag, crag_id) or raise_not_found("skała")
+    data = body.model_dump(exclude={"comment", "grade"})
+    route = Route(crag=crag, source="manual", **data)
+    apply_grade(route, body.grade)
+    start_change(session, nick, body.comment)
+    session.add(route)
+    session.flush()
+    refresh_area_geom(session)
+    session.commit()
+    return {"id": route.id}

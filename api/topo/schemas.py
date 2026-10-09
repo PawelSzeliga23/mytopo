@@ -83,6 +83,7 @@ class CragOut(BaseModel):
     approach_description: str | None
     source: str
     source_url: str | None
+    needs_location: bool
     walls: list[WallOut]
     routes: list[RouteOut]
 
