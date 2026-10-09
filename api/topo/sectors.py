@@ -20,6 +20,7 @@ ROUTE_COPIED_FIELDS = (
 
 
 class ToSectorPreview(TypedDict):
+    kind: str  # "sektor", or "region" when the crag sits directly in an obszar
     sector_name: str
     crags: list[str]
     copied_routes: int
@@ -50,6 +51,10 @@ def make_sector(session: Session, region: Area, name: str, description: str | No
     return sector
 
 
+def _target_kind(crag: Crag) -> str:
+    return "region" if crag.area.kind == "obszar" else "sektor"
+
+
 def _require_walls(crag: Crag) -> list[Wall]:
     walls = list(crag.walls)
     if len(walls) < 2:
@@ -73,6 +78,7 @@ def _crag_name(crag: Crag, wall: Wall, n: int) -> str:
 def to_sector_preview(crag: Crag) -> ToSectorPreview:
     walls = _require_walls(crag)
     return {
+        "kind": _target_kind(crag),
         "sector_name": crag.name,
         "crags": [_crag_name(crag, wall, n) for n, wall in enumerate(walls, 1)],
         "copied_routes": sum(len(on) - 1 for on in _placement(walls).values()),
@@ -84,7 +90,15 @@ def crag_to_sector(session: Session, crag: Crag) -> tuple[Area, list[Crag]]:
     """One transaction; walls and first-wall routes keep their ids, so reverting the transaction restores the crag."""
     walls = _require_walls(crag)
     placement = _placement(walls)
-    sector = make_sector(session, region_of(crag.area), crag.name, crag.description, [])
+    if _target_kind(crag) == "region":  # no region above a crag in an obszar, so the new area is a region
+        sector = Area(
+            kind="region", parent=crag.area, name=crag.name, description=crag.description,
+            slug=unique_slug(session, Area, crag.name), source="manual",
+        )  # fmt: skip
+        session.add(sector)
+        session.flush()
+    else:
+        sector = make_sector(session, region_of(crag.area), crag.name, crag.description, [])
     origin = bytes(crag.location.data)
     new_crags: list[Crag] = []
     for n, wall in enumerate(walls, 1):

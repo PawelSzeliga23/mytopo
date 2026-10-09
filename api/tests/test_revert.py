@@ -244,6 +244,19 @@ def test_revert_crag_to_sector(editor, session):
     assert all(session.get(Crag, c["id"]) is None for c in body["crags"])
 
 
+def test_revert_crag_in_obszar_to_region(editor, session):
+    obszar, crag, walls, _, _ = make_three_wall_crag(session, in_obszar=True)
+    crag_id, wall_ids = crag.id, [w.id for w in walls]
+    body = editor.post(f"/api/crags/{crag_id}/to-sector", json={}).json()
+
+    assert revert(editor, tx_id(session)).status_code == 200
+    session.expire_all()
+    restored = session.get(Crag, crag_id)
+    assert (restored.area_id, [w.id for w in restored.walls]) == (obszar.id, wall_ids)
+    assert session.get(Area, body["sector"]["id"]) is None
+    assert all(session.get(Crag, c["id"]) is None for c in body["crags"])
+
+
 def test_revert_crag_to_sector_after_pin_moved(editor, session):
     _, crag, walls, _, _ = make_three_wall_crag(session)
     crag_id, wall_ids = crag.id, [w.id for w in walls]

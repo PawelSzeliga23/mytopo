@@ -29,7 +29,7 @@ export function ToSectorDialog({ crag, onClose }: { crag: CragDetail; onClose: (
           <DialogTitle>Zamień w sektor</DialogTitle>
           <DialogDescription>
             {data
-              ? `Powstanie sektor ${data.sector_name} i ${data.crags.length} skały (z ${crag.walls.length} ścian); ${data.copied_routes} dróg występuje na kilku ścianach — dostaną kopie. ${data.unplaced} skał trzeba będzie ustawić na mapie.`
+              ? `Powstanie ${data.kind} ${data.sector_name} i ${data.crags.length} skały (z ${crag.walls.length} ścian); ${data.copied_routes} dróg występuje na kilku ścianach — dostaną kopie. ${data.unplaced} skał trzeba będzie ustawić na mapie.`
               : preview.error
                 ? preview.error.message
                 : "Wczytywanie…"}

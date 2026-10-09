@@ -211,6 +211,7 @@ export interface PatchResult {
 }
 
 export interface ToSectorPreview {
+  kind: "sektor" | "region";
   sector_name: string;
   crags: string[];
   copied_routes: number;
@@ -218,7 +219,7 @@ export interface ToSectorPreview {
 }
 
 export interface ToSectorResult {
-  sector: { id: number; slug: string };
+  sector: { id: number; slug: string; kind: "sektor" | "region" };
   crags: { id: number; slug: string; name: string; needs_location: boolean }[];
 }
 

@@ -206,6 +206,6 @@ def convert_to_sector(
     refresh_area_geom(session)
     session.commit()
     return {
-        "sector": {"id": sector.id, "slug": sector.slug},
+        "sector": {"id": sector.id, "slug": sector.slug, "kind": sector.kind},
         "crags": [{"id": c.id, "slug": c.slug, "name": c.name, "needs_location": c.needs_location} for c in new_crags],
     }

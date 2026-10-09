@@ -86,9 +86,11 @@ def test_delete_area_only_when_empty(editor, session):
     assert session.get(Area, empty.id) is None
 
 
-def make_three_wall_crag(session, *, wall_names=("Lewa", "Środek", "Prawa"), in_sector=False):
-    _, region = make_region(session)
+def make_three_wall_crag(session, *, wall_names=("Lewa", "Środek", "Prawa"), in_sector=False, in_obszar=False):
+    obszar, region = make_region(session)
     area = f.area(session, "Sektor", kind="sektor", parent=region) if in_sector else region
+    if in_obszar:
+        region = area = obszar
     crag = f.crag(session, area, "Skała", rock_type="wapień", description="Opis", aspects=["N"])
     walls = [f.wall(session, crag, name, sort_order=i) for i, name in enumerate(wall_names)]
     d1, d2, d3 = (f.route(session, crag, name, "VI", number=i) for i, name in enumerate(("D1", "D2", "D3"), 1))
@@ -142,6 +144,7 @@ def test_crag_to_sector_preview(editor, session):
     _, crag, _, _, _ = make_three_wall_crag(session)
     response = editor.get(f"/api/crags/{crag.id}/to-sector/preview")
     assert response.json() == {
+        "kind": "sektor",
         "sector_name": "Skała",
         "crags": ["Lewa", "Środek", "Prawa"],
         "copied_routes": 1,
@@ -162,6 +165,24 @@ def test_crag_to_sector_needs_login_and_two_walls(client, editor, session):
         assert (response.status_code, response.json()["code"]) == (422, "single_wall")
     client.cookies.clear()
     assert client.get(f"/api/crags/{crag.id}/to-sector/preview").status_code == 401
+
+
+def test_crag_in_obszar_gives_region_inside_it(editor, session):
+    obszar, crag, _, _, _ = make_three_wall_crag(session, in_obszar=True)
+    crag_id = crag.id
+    preview = editor.get(f"/api/crags/{crag_id}/to-sector/preview").json()
+    assert (preview["kind"], preview["sector_name"]) == ("region", "Skała")
+    response = editor.post(f"/api/crags/{crag_id}/to-sector", json={})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["sector"]["kind"] == "region"
+    session.expire_all()
+    region = session.get(Area, body["sector"]["id"])
+    assert (region.kind, region.parent_id, region.name, region.description, region.source) == (
+        "region", obszar.id, "Skała", "Opis", "manual",
+    )  # fmt: skip
+    assert all(session.get(Crag, c["id"]).area_id == region.id for c in body["crags"])
+    assert session.get(Crag, crag_id) is None
 
 
 def test_crag_in_sector_gives_sector_beside(editor, session):
