@@ -224,8 +224,8 @@ na serwerze:
 3. Mapa z trzema poziomami i podkładami.
 4. Strona skały: widok 2D i lista dróg.
 5. Mapy głębi (GPU, CLI) i widok 2.5D.
-6. Hasło, edycja tekstu, historia zmian i cofanie.
-7. Edytor topo i wgrywanie zdjęć z kolejką głębi.
+6. Hasło, edycja danych (pola, położenie skał, usuwanie, sektory, zamiana skały w sektor), historia zmian i cofanie — `2026-10-09-plan-6-edycja-historia-design.md`.
+7. Edytor topo, wgrywanie i wymiana zdjęć z kolejką głębi, edycja modelu 2.5D (pędzle, kolory) z Ctrl+Z krok po kroku.
 8. Wyszukiwarka, strony regionu i sektora, ostatnie zmiany.
 9. Importer wspinanie.pl, eksport i instrukcja wdrożenia na serwer (tunel).
 
