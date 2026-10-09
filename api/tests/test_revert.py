@@ -365,3 +365,23 @@ def test_restored_line_points_keep_ids(editor, session):
     session.expire_all()
     restored = session.scalars(select(LinePoint.id).where(LinePoint.line_id == line_a_id).order_by(LinePoint.id))
     assert restored.all() == point_ids
+
+
+def test_revert_of_topo_save_bumps_version(editor, session):
+    crag, _ = make_crag(session)
+    wall = f.wall(session, crag)
+    session.commit()
+    wall_id = wall.id
+    body = {
+        "version": 1, "new_routes": [{"ref": "r", "name": "Nowa", "grade": "VI"}],
+        "lines": [{"ref": "l", "route_ref": "r", "sort_order": 0,
+                   "points": [{"ref": "a", "sort_order": 0, "x": 0.2, "y": 0.9, "kind": "start"},
+                              {"ref": "b", "sort_order": 1, "x": 0.3, "y": 0.1, "kind": "stanowisko"}]}],
+    }  # fmt: skip
+    ids = editor.put(f"/api/walls/{wall_id}/lines", json=body).json()["ids"]
+    assert revert(editor, tx_id(session)).status_code == 200
+    session.expire_all()
+    assert session.get(RouteLine, ids["l"]) is None and session.get(Route, ids["r"]) is None
+    assert session.get(Wall, wall_id).version == 3  # 1 → save → 2 → revert → 3
+    stale = editor.put(f"/api/walls/{wall_id}/lines", json={"version": 2, "new_routes": [], "lines": []})
+    assert stale.status_code == 409

@@ -22,6 +22,7 @@ from topo.editing import apply_grade, delete_crag, delete_line, delete_route, de
 from topo.history import current_transaction_id, set_author, transaction_class
 from topo.models import Area, Crag, LinePoint, Route, RouteLine, Wall
 from topo.slugs import unique_slug
+from topo.topo_edit import bump_wall_versions, walls_touched
 
 Mode = Literal["check", "safe", "all"]
 
@@ -337,6 +338,8 @@ def revert_transaction(
         _restore(session, plan.restores)
         _delete(session, plan.deletes)
         _restore_depth(session, [c.id for c in plan.inserts if c.model is Wall], media_root)
+        # An open topo editor must notice that the lines under it changed.
+        bump_wall_versions(session, walls_touched(session, changes))
         refresh_area_geom(session)
         new_id = current_transaction_id(session)
     except Exception:

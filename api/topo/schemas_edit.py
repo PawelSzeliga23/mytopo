@@ -111,3 +111,55 @@ class AreaPatch(PatchBase):
 
 class RevertBody(EditBase):
     mode: Literal["safe", "all"] | None = None  # None: revert only when nothing conflicts
+
+
+# --- Topo of a photo (PUT /api/walls/{id}/lines): saved objects by id, new ones by a client ref ---
+
+PointKindIn = Literal["start", "ring", "hak", "ucho", "stanowisko", "ogranicznik", "przelot"]
+Ref = Annotated[str, Field(min_length=1, max_length=40)]
+Coord = Annotated[float, Field(ge=0, le=1, allow_inf_nan=False)]
+
+
+class _IdOrRef(BaseModel):
+    id: int | None = None
+    ref: Ref | None = None
+
+    @model_validator(mode="after")
+    def _one_of(self) -> "_IdOrRef":
+        if (self.id is None) == (self.ref is None):
+            raise ValueError("Każdy obiekt potrzebuje id albo ref")
+        return self
+
+
+class PointIn(_IdOrRef):
+    sort_order: int
+    x: Coord
+    y: Coord
+    kind: PointKindIn
+
+
+class ParentIn(BaseModel):
+    line_id: int | None = None
+    line_ref: Ref | None = None
+    point_id: int | None = None
+    point_ref: Ref | None = None
+
+
+class LineIn(_IdOrRef):
+    route_id: int | None = None
+    route_ref: Ref | None = None
+    sort_order: int
+    parent: ParentIn | None = None
+    points: Annotated[list[PointIn], Field(min_length=2)]
+
+
+class NewRouteIn(BaseModel):
+    ref: Ref
+    name: RouteName
+    grade: str | None = None
+
+
+class WallLinesIn(EditBase):
+    version: int
+    new_routes: list[NewRouteIn] = []
+    lines: list[LineIn]

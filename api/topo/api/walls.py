@@ -1,6 +1,7 @@
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Response
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from topo.api.deps import current_editor, start_change
@@ -8,7 +9,8 @@ from topo.api.errors import raise_not_found
 from topo.db import get_session
 from topo.editing import apply_fields, delete_wall
 from topo.models import Wall
-from topo.schemas_edit import DeleteBody, WallPatch
+from topo.schemas_edit import DeleteBody, WallLinesIn, WallPatch
+from topo.topo_edit import VersionConflict, save_wall_lines
 
 router = APIRouter(tags=["walls"])
 
@@ -40,3 +42,24 @@ def remove_wall(
     delete_wall(session, wall)
     session.commit()
     return Response(status_code=204)
+
+
+@router.put("/{wall_id:int}/lines")
+def put_wall_lines(
+    wall_id: int, body: WallLinesIn, nick: str = Depends(current_editor), session: Session = Depends(get_session)
+) -> Any:
+    wall = session.get(Wall, wall_id) or raise_not_found("ściana")
+    start_change(session, nick, body.comment)
+    try:
+        result = save_wall_lines(session, wall, body)
+    except VersionConflict as exc:
+        session.rollback()
+        content = {"code": "version_conflict", "message": "Ktoś zapisał topo w międzyczasie", "current_version": exc.current}
+        return JSONResponse(content, status_code=409)
+    except Exception:
+        session.rollback()
+        raise
+    if result is None:
+        session.rollback()
+        return {"version": wall.version, "ids": {}}
+    return {"version": result.version, "ids": result.ids}
