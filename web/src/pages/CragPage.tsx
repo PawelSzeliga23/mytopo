@@ -9,6 +9,7 @@ import { CragInfo } from "@/crag/CragInfo";
 import { CragEditForm } from "@/crag/edit/CragEditForm";
 import { CragMenu } from "@/crag/edit/CragMenu";
 import { RouteEditPanel } from "@/crag/edit/RouteEditPanel";
+import { HistoryPanel } from "@/history/HistoryPanel";
 import { RouteList } from "@/crag/RouteList";
 import { routeRows, type RouteRow } from "@/crag/topo";
 import { compactSpacer, phoneViewerHeight, useCompactOnScroll } from "@/crag/useCompactOnScroll";
@@ -29,6 +30,7 @@ export default function CragPage() {
   const compact = useCompactOnScroll(!isDesktop);
   const { isEditor, reauthenticating } = useSession();
   const [editing, setEditing] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const { data: crag, error, isPending } = useQuery({ queryKey: ["crag", slug], queryFn: () => api.crag(slug) });
   const [wallId, setWallId] = useState<number | null>(null);
   const [selectedRouteId, setSelectedRouteId] = useState<number | null>(null);
@@ -106,7 +108,7 @@ export default function CragPage() {
                       <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
                         ✎ Edytuj skałę
                       </Button>
-                      <CragMenu crag={crag} wall={wall} />
+                      <CragMenu crag={crag} wall={wall} onHistory={() => setHistoryOpen(true)} />
                     </div>
                   )}
                 </div>
@@ -154,6 +156,7 @@ export default function CragPage() {
             )}
           </div>
           {spacer && <div aria-hidden style={{ height: spacer }} />}
+          {historyOpen && <HistoryPanel crag={crag} onClose={() => setHistoryOpen(false)} />}
           {panel && <RouteEditPanel key={panel.route?.id ?? "new"} cragId={crag.id} slug={crag.slug} route={panel.route} onClose={() => setPanel(null)} />}
         </div>
       )}

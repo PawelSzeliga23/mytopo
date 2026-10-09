@@ -94,3 +94,27 @@
     @apply bg-background text-foreground font-sans antialiased;
   }
 }
+
+/* History diffs: the old value struck through, the new one highlighted. */
+.diff-del {
+  background: #f2d9d4;
+  color: #b23a2b;
+  text-decoration: line-through;
+  padding: 0 3px;
+  border-radius: 3px;
+}
+.diff-ins {
+  background: #d8e6ec;
+  color: #245b72;
+  text-decoration: none;
+  padding: 0 3px;
+  border-radius: 3px;
+}
+.dark .diff-del {
+  background: #4a2520;
+  color: #f2a59a;
+}
+.dark .diff-ins {
+  background: #1f3a47;
+  color: #8ccbe6;
+}
