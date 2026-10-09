@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { GradeBadge } from "@/components/GradeBadge";
+import { Button } from "@/components/ui/button";
 import { labelTextColor, type RouteRow, type RouteRows } from "@/crag/topo";
 import type { RouteOut } from "@/lib/api";
 import { formatDecimal } from "@/lib/format";
@@ -13,6 +14,10 @@ interface RouteListProps {
   hoveredRouteId: number | null;
   onChoose: (row: RouteRow) => void;
   onHover: (routeId: number | null) => void;
+  /** Editor: ✎ in each row and "+ Dodaj drogę" under the list. */
+  editable?: boolean;
+  onEdit?: (route: RouteOut) => void;
+  onAdd?: () => void;
 }
 
 function meta(route: RouteOut): string {
@@ -22,7 +27,7 @@ function meta(route: RouteOut): string {
     .join(" · ");
 }
 
-function Row({ row, hint, selected, hovered, onChoose, onHover }: { row: RouteRow; hint: string | null; selected: boolean; hovered: boolean } & Pick<RouteListProps, "onChoose" | "onHover">) {
+function Row({ row, hint, selected, hovered, onChoose, onHover, editable, onEdit }: { row: RouteRow; hint: string | null; selected: boolean; hovered: boolean } & Pick<RouteListProps, "onChoose" | "onHover" | "editable" | "onEdit">) {
   const { theme } = useTheme();
   const ref = useRef<HTMLLIElement>(null);
   useEffect(() => {
@@ -32,7 +37,7 @@ function Row({ row, hint, selected, hovered, onChoose, onHover }: { row: RouteRo
   const { route } = row;
   const details = meta(route);
   return (
-    <li ref={ref} className="scroll-mt-[32vh] lg:scroll-mt-4">
+    <li ref={ref} className="flex items-start gap-1 scroll-mt-[32vh] lg:scroll-mt-4">
       <button
         type="button"
         aria-pressed={selected}
@@ -40,7 +45,7 @@ function Row({ row, hint, selected, hovered, onChoose, onHover }: { row: RouteRo
         onClick={() => onChoose(row)}
         onPointerEnter={(event) => event.pointerType === "mouse" && onHover(route.id)}
         onPointerLeave={(event) => event.pointerType === "mouse" && onHover(null)}
-        className={`flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left ${selected ? "bg-secondary" : hovered ? "bg-secondary/60" : "hover:bg-secondary/60"}`}
+        className={`flex min-w-0 flex-1 items-start gap-3 rounded-lg px-2 py-2 text-left ${selected ? "bg-secondary" : hovered ? "bg-secondary/60" : "hover:bg-secondary/60"}`}
       >
         <span
           aria-hidden
@@ -57,6 +62,17 @@ function Row({ row, hint, selected, hovered, onChoose, onHover }: { row: RouteRo
         </span>
         <GradeBadge grade={route.grade} sort={route.grade_sort} french={route.grade_fr} />
       </button>
+      {editable && (
+        // A sibling of the row button (buttons cannot nest), so editing does not toggle the selection.
+        <button
+          type="button"
+          aria-label={`Edytuj drogę ${route.name}`}
+          onClick={() => onEdit?.(route)}
+          className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"
+        >
+          ✎
+        </button>
+      )}
     </li>
   );
 }
@@ -75,6 +91,8 @@ function Group({ title, rows, hintFor, ...rest }: { title: string; rows: RouteRo
             hovered={row.route.id === rest.hoveredRouteId}
             onChoose={rest.onChoose}
             onHover={rest.onHover}
+            editable={rest.editable}
+            onEdit={rest.onEdit}
           />
         ))}
       </ul>
@@ -83,12 +101,18 @@ function Group({ title, rows, hintFor, ...rest }: { title: string; rows: RouteRo
 }
 
 export function RouteList({ rows, wallNames, ...rest }: RouteListProps) {
-  if (rows.onWall.length + rows.other.length === 0) return <p className="text-sm text-muted-foreground">Ta skała nie ma jeszcze dróg.</p>;
+  const empty = rows.onWall.length + rows.other.length === 0;
   const otherHint = (row: RouteRow) => (row.wallId === null ? "bez topo" : `na zdjęciu „${wallNames.get(row.wallId) ?? ""}”`);
   return (
     <div className="flex flex-col gap-4">
+      {empty && <p className="text-sm text-muted-foreground">Ta skała nie ma jeszcze dróg.</p>}
       {rows.onWall.length > 0 && <Group title="Na tym zdjęciu" rows={rows.onWall} hintFor={() => null} {...rest} />}
       {rows.other.length > 0 && <Group title={rows.onWall.length > 0 ? "Pozostałe drogi" : "Drogi"} rows={rows.other} hintFor={otherHint} {...rest} />}
+      {rest.editable && (
+        <Button type="button" variant="outline" size="sm" className="self-start" onClick={rest.onAdd}>
+          + Dodaj drogę
+        </Button>
+      )}
     </div>
   );
 }

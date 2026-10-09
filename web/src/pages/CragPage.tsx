@@ -8,12 +8,13 @@ import { Button } from "@/components/ui/button";
 import { CragInfo } from "@/crag/CragInfo";
 import { CragEditForm } from "@/crag/edit/CragEditForm";
 import { CragMenu } from "@/crag/edit/CragMenu";
+import { RouteEditPanel } from "@/crag/edit/RouteEditPanel";
 import { RouteList } from "@/crag/RouteList";
 import { routeRows, type RouteRow } from "@/crag/topo";
 import { compactSpacer, phoneViewerHeight, useCompactOnScroll } from "@/crag/useCompactOnScroll";
 import { WallThumbnails, wallLabel } from "@/crag/WallThumbnails";
 import { WallViewer } from "@/crag/WallViewer";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, type RouteOut } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { useIsDesktop } from "@/lib/useMediaQuery";
 import { formatViewHash } from "@/map/view";
@@ -32,6 +33,8 @@ export default function CragPage() {
   const [wallId, setWallId] = useState<number | null>(null);
   const [selectedRouteId, setSelectedRouteId] = useState<number | null>(null);
   const [hoveredRouteId, setHoveredRouteId] = useState<number | null>(null);
+  // The route panel: null = closed, { route: null } = a new route. It stays mounted while open, whatever the session does.
+  const [panel, setPanel] = useState<{ route: RouteOut | null } | null>(null);
 
   useEffect(() => {
     if (!crag) return;
@@ -55,6 +58,11 @@ export default function CragPage() {
   function chooseRow(row: RouteRow) {
     if (row.wallId !== null && row.wallId !== wall?.id) setWallId(row.wallId);
     setSelectedRouteId((current) => (current === row.route.id ? null : row.route.id));
+  }
+
+  function editRoute(route: RouteOut) {
+    setSelectedRouteId(route.id);
+    setPanel({ route });
   }
 
   const aspect = wall?.image_width && wall.image_height ? wall.image_height / wall.image_width : 4 / 3;
@@ -132,6 +140,9 @@ export default function CragPage() {
               hoveredRouteId={hoveredRouteId}
               onChoose={chooseRow}
               onHover={setHoveredRouteId}
+              editable={isEditor || reauthenticating}
+              onEdit={editRoute}
+              onAdd={() => setPanel({ route: null })}
             />
             {crag.source === "portalgorski" && crag.source_url && (
               <p className="text-xs text-muted-foreground">
@@ -143,6 +154,7 @@ export default function CragPage() {
             )}
           </div>
           {spacer && <div aria-hidden style={{ height: spacer }} />}
+          {panel && <RouteEditPanel key={panel.route?.id ?? "new"} cragId={crag.id} slug={crag.slug} route={panel.route} onClose={() => setPanel(null)} />}
         </div>
       )}
     </div>
