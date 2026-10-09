@@ -75,6 +75,10 @@ def delete_route(session: Session, route: Route) -> None:
     session.delete(route)
 
 
+def delete_line(session: Session, line: RouteLine) -> None:
+    _delete_lines(session, [line])
+
+
 def delete_wall(session: Session, wall: Wall) -> None:
     _detach_outside_variants(session, wall.lines)
     session.delete(wall)

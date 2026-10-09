@@ -75,6 +75,12 @@ def transaction_class() -> type:
     return versioning_manager.transaction_cls
 
 
+def current_transaction_id(session: Session) -> int | None:
+    """Id of the history transaction the session's flushes have written so far (None: nothing versioned yet)."""
+    transaction = versioning_manager.unit_of_work(session).current_transaction
+    return transaction.id if transaction is not None else None
+
+
 def has_manual_version(session: Session, model: type, *conditions) -> bool:
     """True if any version row of ``model`` matching ``conditions`` was written by someone other than an importer.
 

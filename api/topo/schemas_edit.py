@@ -107,3 +107,7 @@ class AreaPatch(PatchBase):
     name: Name | None = None
     description: str | None = None
     parent_id: int | None = None
+
+
+class RevertBody(EditBase):
+    mode: Literal["safe", "all"] | None = None  # None: revert only when nothing conflicts
