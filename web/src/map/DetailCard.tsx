@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Chip } from "@/components/Chip";
 import { GradeBadge } from "@/components/GradeBadge";
 import { GradeBar } from "@/components/GradeBar";
@@ -10,8 +10,9 @@ import { cragGradeRange, formatGradeRange } from "@/lib/grades";
 import { countLabel, DROGI, SKALY } from "@/lib/plural";
 import { compareRoutes } from "@/lib/routes";
 import { useIsDesktop } from "@/lib/useMediaQuery";
-import { AreaEditDialog } from "@/map/edit/AreaEditDialog";
 import type { Selection } from "@/map/selection";
+
+const AreaEditDialog = lazy(() => import("@/map/edit/AreaEditDialog").then((m) => ({ default: m.AreaEditDialog })));
 
 type BBox = [number, number, number, number];
 
@@ -156,6 +157,7 @@ export function DetailCardBody({ selection, onZoom, onOpenCrag, onSelectCrag, ed
             </Button>
           )}
           {editingArea && (
+            <Suspense fallback={null}>
             <AreaEditDialog
               area={selection.area}
               onClose={() => setEditingArea(false)}
@@ -164,6 +166,7 @@ export function DetailCardBody({ selection, onZoom, onOpenCrag, onSelectCrag, ed
                 onAreaEdited?.();
               }}
             />
+            </Suspense>
           )}
         </>
       )}

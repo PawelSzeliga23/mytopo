@@ -1,5 +1,5 @@
 import "@/map/worker";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Map, { AttributionControl, Layer, Marker, Source, type MapLayerMouseEvent, type MapRef } from "react-map-gl/maplibre";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -10,12 +10,10 @@ import type { AreaProps, CragProps } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
 import { DetailCard } from "@/map/DetailCard";
-import { AddCragBar, AddCragDialog } from "@/map/edit/AddCragDialog";
 import { convexHull } from "@/map/edit/geo";
 import { BROWSE, parseMoveParam, toggleCrag, type LngLat, type MapMode } from "@/map/edit/mode";
 import { MoveCragBar } from "@/map/edit/MoveCragBar";
 import { NewSectorBar } from "@/map/edit/NewSectorBar";
-import { NewSectorDialog } from "@/map/edit/NewSectorDialog";
 import {
   cragLayers,
   hullLayers,
@@ -32,6 +30,11 @@ import type { Selection } from "@/map/selection";
 import { BASE_LAYERS, buildBaseStyle, type BaseLayer } from "@/map/style";
 import { TopBar } from "@/map/TopBar";
 import { useMapData } from "@/map/useMapData";
+
+// Edit-only dialogs: loaded when first opened, not with the map.
+const AddCragBar = lazy(() => import("@/map/edit/AddCragDialog").then((m) => ({ default: m.AddCragBar })));
+const AddCragDialog = lazy(() => import("@/map/edit/AddCragDialog").then((m) => ({ default: m.AddCragDialog })));
+const NewSectorDialog = lazy(() => import("@/map/edit/NewSectorDialog").then((m) => ({ default: m.NewSectorDialog })));
 
 const BASE_KEY = "topo-base";
 const INITIAL_VIEW = { longitude: 19.8, latitude: 50.35, zoom: 8 };
@@ -328,6 +331,7 @@ export default function MapPage() {
       {mode.kind === "move" && moveOrigin && (
         <MoveCragBar crag={mode.crag} origin={moveOrigin} target={mode.target} onCancel={leaveEdit} onSaved={leaveEdit} />
       )}
+      <Suspense fallback={null}>
       {mode.kind === "add" && !mode.point && <AddCragBar onCancel={leaveEdit} />}
       {mode.kind === "add" && mode.point && (
         <AddCragDialog point={mode.point} regions={[...index.regions.values()]} sectors={[...index.sectors.values()]} onClose={leaveEdit} />
@@ -353,6 +357,7 @@ export default function MapPage() {
           onCreated={leaveEdit}
         />
       )}
+      </Suspense>
       <DetailCard
         selection={mode.kind === "browse" ? selection : null}
         onClose={() => setSelection(null)}

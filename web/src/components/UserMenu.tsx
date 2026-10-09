@@ -1,7 +1,9 @@
+import { lazy, Suspense } from "react";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useSession } from "@/lib/session";
+
+const UserDropdown = lazy(() => import("@/components/UserDropdown"));
 
 export function UserMenu() {
   const { nick, isEditor, logout, requestLogin } = useSession();
@@ -23,17 +25,15 @@ export function UserMenu() {
           </span>
         </Link>
       </Button>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
+      <Suspense
+        fallback={
           <Button variant="ghost" size="sm">
             ● {nick} ▾
           </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => void requestLogin()}>Zmień nick</DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => void logout()}>Wyloguj</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+        }
+      >
+        <UserDropdown nick={nick} onChangeNick={() => void requestLogin()} onLogout={() => void logout()} />
+      </Suspense>
     </div>
   );
 }
