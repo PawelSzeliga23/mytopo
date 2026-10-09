@@ -1,3 +1,5 @@
+import sqlalchemy as sa
+
 from tests import factories as f
 from tests.test_api_edit import last_transaction
 from topo.changes import KIND, MODELS, SKIP_FIELDS, transaction_changes
@@ -208,3 +210,22 @@ def test_reverted_by(editor, session):
     assert items[original]["reverted_by"] == revert
     assert items[revert]["reverts_id"] == original and items[revert]["reverted_by"] is None
 
+
+
+def test_first_versioned_update_of_preexisting_row_stays_updated(editor, session):
+    region = f.area(session, "Dolina")
+    session.commit()
+    # Inserted through Core, so Continuum writes no version row (like data that predates versioning).
+    crag_id = session.execute(
+        sa.insert(Crag.__table__)
+        .values(area_id=region.id, name="Stara", slug="stara", location=sa.func.ST_GeomFromText("POINT(19.7 50.1)", 4326))
+        .returning(Crag.__table__.c.id)
+    ).scalar_one()
+    session.commit()
+
+    assert editor.patch(f"/api/crags/{crag_id}", json={"description": "Opis"}).status_code == 200
+    [change] = transaction_changes(session, last_transaction(session).id)
+    assert (change.op, change.before) == ("updated", None)
+    assert change.after["description"] == "Opis"
+    [item] = changes_for(editor)["items"][:1]
+    assert item["objects"][0]["op"] == "updated"

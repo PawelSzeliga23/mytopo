@@ -56,9 +56,9 @@ def _is_empty(value: Any) -> bool:
 
 def _diffs(op: Op, before: dict[str, Any] | None, after: dict[str, Any] | None) -> list[FieldDiff]:
     names = [name for name in (after or before or {}) if name not in SKIP_FIELDS and name != "id"]
-    if op == "updated":
+    if op == "updated" and before is not None:
         return [FieldDiff(n, before[n], after[n]) for n in names if before[n] != after[n]]
-    if op == "created":
+    if op in ("created", "updated"):  # updated here means before is unknown: list the non-empty values
         return [FieldDiff(n, None, after[n]) for n in names if not _is_empty(after[n])]
     return [FieldDiff(n, before[n], None) for n in names if not _is_empty(before[n])]
 
@@ -87,9 +87,8 @@ def transaction_changes(session: Session, tx_id: int) -> list[ObjectChange]:
                 before, after = current, None  # Continuum copies the last state into the delete row
             else:
                 previous = _latest_version(session, model, row.id, tx_id)
+                # No earlier version (row predates versioning): baseline unknown, so it stays "updated" with before=None.
                 before, after = (version_values(model, previous) if previous else None), current
-                if before is None:
-                    op = "created"
             changes.append(ObjectChange(model, row.id, op, before, after, _diffs(op, before, after)))
     return changes
 
@@ -115,6 +114,13 @@ def _object_changes(session: Session, tx_id: int, changes: list[ObjectChange]) -
     """Output objects (line and point changes folded into one "topo" object per wall) and the first crag concerned."""
     objects: list[ObjectChangeOut] = []
     topo: dict[int, dict[str, int]] = {}  # wall id -> number of changed lines / points
+    cache: dict[tuple[type, int], Any] = {}
+
+    def latest(model: type, obj_id: int):
+        if (model, obj_id) not in cache:
+            cache[model, obj_id] = _latest_version(session, model, obj_id, tx_id, inclusive=True)
+        return cache[model, obj_id]
+
     crag_id: int | None = None
     for change in changes:
         values = change.after if change.after is not None else change.before
@@ -128,9 +134,9 @@ def _object_changes(session: Session, tx_id: int, changes: list[ObjectChange]) -
             if change.model is RouteLine:
                 wall_id = values["wall_id"]
             else:
-                line = _latest_version(session, RouteLine, values["line_id"], tx_id, inclusive=True)
+                line = latest(RouteLine, values["line_id"])
                 wall_id = line.wall_id if line else None
-            wall = _latest_version(session, Wall, wall_id, tx_id, inclusive=True) if wall_id else None
+            wall = latest(Wall, wall_id) if wall_id else None
             this_crag = wall.crag_id if wall else None
             if wall_id is not None:
                 counts = topo.setdefault(wall_id, {"lines": 0, "points": 0})
@@ -146,7 +152,7 @@ def _object_changes(session: Session, tx_id: int, changes: list[ObjectChange]) -
             )
         )
     for wall_id, counts in topo.items():
-        wall = _latest_version(session, Wall, wall_id, tx_id, inclusive=True)
+        wall = latest(Wall, wall_id)
         objects.append(
             ObjectChangeOut(
                 kind="topo", id=wall_id, name=wall.name if wall else None, op="updated", diffs=[],
