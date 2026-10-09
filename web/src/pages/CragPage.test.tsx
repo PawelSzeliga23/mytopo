@@ -127,6 +127,24 @@ describe("CragPage", () => {
     expect(rowsOf("Na tym zdjęciu")).toHaveLength(1);
   });
 
+  it("podpis z nazwą bieżącej ściany, zmienia się z miniaturą", async () => {
+    renderAt(crag);
+    expect(await screen.findByTestId("wall-caption")).toHaveTextContent("Brzuchata Turniczka · Lewa ściana");
+    await userEvent.click(screen.getByRole("button", { name: "Prawa ściana" }));
+    expect(screen.getByTestId("wall-caption")).toHaveTextContent("Brzuchata Turniczka · Prawa ściana");
+  });
+
+  it("ściana bez nazwy dostaje numer w podpisie", async () => {
+    renderAt(makeCrag([makeWall(20, [], {}), makeWall(21, [], { name: "Druga" })], routes));
+    expect(await screen.findByTestId("wall-caption")).toHaveTextContent("Brzuchata Turniczka · Ściana 1");
+  });
+
+  it("pojedyncza ściana bez nazwy: brak podpisu", async () => {
+    renderAt(makeCrag([makeWall(20, [], {})], routes));
+    await screen.findByTestId("viewer");
+    expect(screen.queryByTestId("wall-caption")).not.toBeInTheDocument();
+  });
+
   it("skała bez zdjęć: komunikat i lista dróg", async () => {
     renderAt(makeCrag([], routes));
     expect(await screen.findByText("Ta skała nie ma jeszcze zdjęć z topo.")).toBeInTheDocument();
