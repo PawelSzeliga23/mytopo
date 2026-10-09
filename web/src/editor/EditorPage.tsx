@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { useStore } from "zustand";
@@ -6,7 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { ConfirmDialog } from "@/crag/edit/ConfirmDialog";
 import { wallLabel } from "@/crag/WallThumbnails";
-import { countChanges, draftFromWall, loadLocal, saveLocal, clearLocal } from "@/editor/draft";
+import { applySaved, clearLocal, countChanges, draftFromWall, loadLocal, saveLocal, toSaveBody } from "@/editor/draft";
+import { ConflictTopoDialog } from "@/editor/ConflictTopoDialog";
+import { draftLabels } from "@/editor/labels";
+import { SaveButton } from "@/editor/SaveBar";
 import { EditorCanvas, type Tool } from "@/editor/EditorCanvas";
 import { LinesPanel } from "@/editor/LinesPanel";
 import { PointPanel } from "@/editor/PointPanel";
@@ -14,8 +17,8 @@ import { RoutePicker } from "@/editor/RoutePicker";
 import { useEditor } from "@/editor/store";
 import { Toolbar } from "@/editor/Toolbar";
 import type { Draft, DraftRouteRef } from "@/editor/types";
-import { api, type CragDetail, type WallOut } from "@/lib/api";
-import { useSession } from "@/lib/session";
+import { api, ApiError, type CragDetail, type WallOut } from "@/lib/api";
+import { useEditorMutation, useSession } from "@/lib/session";
 import { useElementSize } from "@/lib/useElementSize";
 import { useHtmlImage } from "@/lib/useHtmlImage";
 import { useIsDesktop } from "@/lib/useMediaQuery";
@@ -71,7 +74,46 @@ function Editor({ crag, wall }: { crag: CragDetail; wall: WallOut }) {
   const holder = useRef<HTMLDivElement>(null);
   const size = useElementSize(holder);
   const routes = useMemo(() => new Map(crag.routes.map((route) => [route.id, route])), [crag.routes]);
-  const [base] = useState<Draft>(() => draftFromWall(wall));
+  const client = useQueryClient();
+  // The last saved topo: "n zmian" counts against it and the local draft is dropped when equal to it.
+  const [base, setBase] = useState<Draft>(() => draftFromWall(wall));
+  const [conflict, setConflict] = useState<{ comment: string | null; current: number } | null>(null);
+  const save = useEditorMutation(
+    ({ sent, comment, version }: { sent: Draft; comment: string | null; version: number | null }) =>
+      api.saveWallLines(wall.id, toSaveBody(version === null ? sent : { ...sent, baseVersion: version }, comment)),
+    {
+      invalidate: [["crag", crag.slug], ["map"]],
+      successToast: "Zapisano topo",
+      onSuccess: (result, { sent }) => {
+        // Checkpoint: real ids into the draft and every undo step, so undo after a save never revives id-less copies.
+        useEditor.getState().rebase((draft) => applySaved(draft, result));
+        setBase(applySaved(sent, result));
+        clearLocal(wall.id);
+      },
+    },
+  );
+  const submit = (comment: string | null, version: number | null) => {
+    save.mutate(
+      { sent: useEditor.getState().draft, comment, version },
+      {
+        onError: (error) => {
+          if (error instanceof ApiError && error.code === "version_conflict") {
+            const current = (error.body as { current_version?: number } | null)?.current_version ?? wall.version;
+            setConflict({ comment, current });
+          }
+        },
+      },
+    );
+  };
+  const openLatest = async () => {
+    setConflict(null);
+    const fresh = await client.fetchQuery({ queryKey: ["crag", crag.slug], queryFn: () => api.crag(crag.slug), staleTime: 0 });
+    const latest = fresh.walls.find((candidate) => candidate.id === wall.id);
+    if (!latest) return;
+    const draftNow = draftFromWall(latest);
+    setBase(draftNow);
+    useEditor.getState().load(draftNow, useEditor.getState().image);
+  };
   const [prompt, setPrompt] = useState<Prompt>(() => {
     const local = loadLocal(wall.id);
     if (!local || countChanges(draftFromWall(wall), local.draft) === 0) return null;
@@ -112,8 +154,8 @@ function Editor({ crag, wall }: { crag: CragDetail; wall: WallOut }) {
       if (state.draft === previous.draft) return;
       clearTimeout(timer);
       timer = setTimeout(() => {
+        // Never cleared here: after "Otwórz najnowszą" the old draft stays until the next edit (a draft equal to the saved topo is not offered back).
         if (countChanges(base, state.draft) > 0) saveLocal(state.draft);
-        else clearLocal(state.draft.wallId);
       }, AUTOSAVE_MS);
     });
     return () => {
@@ -205,12 +247,10 @@ function Editor({ crag, wall }: { crag: CragDetail; wall: WallOut }) {
       </Button>
     </div>
   );
-  const saveButton = (
-    <Button size="sm" disabled title="Zapis w następnym kroku">
-      Zapisz
-      {changes > 0 ? ` (${changes} ${changes === 1 ? "zmiana" : "zmian"})` : ""}
-    </Button>
-  );
+  const labels = draftLabels(draft);
+  const short = draft.lines.find((line) => line.points.length < 2);
+  const blocked = short ? `Linia ${labels.get(short.key) ?? ""} ma za mało punktów` : null;
+  const saveButton = <SaveButton count={changes} blocked={blocked} pending={save.isPending} onSave={(comment) => submit(comment, null)} />;
   const linesPanel = (
     <LinesPanel
       routes={routes}
@@ -324,6 +364,15 @@ function Editor({ crag, wall }: { crag: CragDetail; wall: WallOut }) {
         destructive
         onConfirm={exit}
         onCancel={() => setLeaving(false)}
+      />
+      <ConflictTopoDialog
+        open={conflict !== null}
+        onOpenLatest={() => void openLatest()}
+        onOverwrite={() => {
+          if (conflict) submit(conflict.comment, conflict.current);
+          setConflict(null);
+        }}
+        onCancel={() => setConflict(null)}
       />
     </div>
   );

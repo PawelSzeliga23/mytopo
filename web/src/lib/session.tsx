@@ -115,8 +115,8 @@ export function useEditorMutation<V, R>(fn: (variables: V) => Promise<R>, option
       options.onSuccess?.(result, variables);
     },
     onError: (error) => {
-      // A revert conflict is shown by the caller, with the list of fields.
-      if (error instanceof ApiError && error.code === "revert_conflict") return;
+      // Conflicts are shown by the caller: a revert's list of fields, a topo save's "someone saved meanwhile" dialog.
+      if (error instanceof ApiError && (error.code === "revert_conflict" || error.code === "version_conflict")) return;
       toast.error(error.message);
     },
   });
