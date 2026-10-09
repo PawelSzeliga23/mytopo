@@ -35,6 +35,13 @@ describe("warstwy mapy", () => {
     expect("filter" in byId["crags-sector"] ? byId["crags-sector"].filter : undefined).toEqual(["==", ["get", "area_kind"], "sektor"]);
   });
 
+  it("pinezka skały do rozstawienia jest żółta", () => {
+    const circle = cragLayers(colors).find((layer) => layer.id === "crags-sector");
+    const color = JSON.stringify(circle && "paint" in circle ? (circle.paint as Record<string, unknown>)["circle-color"] : null);
+    expect(color).toContain("needs_location");
+    expect(color).toContain("#E0A100");
+  });
+
   it("klikalne są tylko punkty i obrysy", () => {
     const all = [...regionLayers(colors), ...sectorLayers(colors), ...cragLayers(colors)].map((layer) => layer.id ?? "");
     for (const id of INTERACTIVE_LAYERS) expect(all).toContain(id);

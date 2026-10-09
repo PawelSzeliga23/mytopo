@@ -5,11 +5,12 @@ import { GradeBadge } from "@/components/GradeBadge";
 import { GradeBar } from "@/components/GradeBar";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
-import { api, type CragProps } from "@/lib/api";
+import { api, type AreaProps, type CragProps } from "@/lib/api";
 import { cragGradeRange, formatGradeRange } from "@/lib/grades";
 import { countLabel, DROGI, SKALY } from "@/lib/plural";
 import { compareRoutes } from "@/lib/routes";
 import { useIsDesktop } from "@/lib/useMediaQuery";
+import { AreaEditDialog } from "@/map/edit/AreaEditDialog";
 import type { Selection } from "@/map/selection";
 
 type BBox = [number, number, number, number];
@@ -19,6 +20,13 @@ interface BodyProps {
   onZoom: (bbox: BBox) => void;
   onOpenCrag: (slug: string) => void;
   onSelectCrag: (crag: CragProps) => void;
+  /** Shows the edit controls (logged in, or logging in again). */
+  editable?: boolean;
+  onNewSector?: (region: AreaProps) => void;
+  /** Starts moving the crag's pin on the map. */
+  onMoveCrag?: (crag: CragProps) => void;
+  /** The area was edited or deleted, so the card is stale. */
+  onAreaEdited?: () => void;
 }
 
 const KIND_LABEL = { region: "Region", sektor: "Sektor", crag: "Skała" } as const;
@@ -73,13 +81,44 @@ function AreaCragList({ crags, onSelect }: { crags: CragProps[]; onSelect: (crag
   );
 }
 
-export function DetailCardBody({ selection, onZoom, onOpenCrag, onSelectCrag }: BodyProps) {
+function UnplacedList({ crags, onPlace }: { crags: CragProps[]; onPlace: (crag: CragProps) => void }) {
+  const unplaced = crags.filter((crag) => crag.needs_location);
+  if (unplaced.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-xs font-semibold">{`Do rozstawienia: ${unplaced.length}`}</p>
+      <ul aria-label="Do rozstawienia" className="flex flex-col divide-y divide-border text-sm">
+        {unplaced.map((crag) => (
+          <li key={crag.id} className="flex items-center justify-between gap-2 py-1">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span aria-hidden className="size-2 shrink-0 rounded-full bg-[#E0A100]" />
+              <span className="truncate">{crag.name}</span>
+            </span>
+            <Button type="button" size="xs" onClick={() => onPlace(crag)}>
+              Ustaw na mapie
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export function DetailCardBody({ selection, onZoom, onOpenCrag, onSelectCrag, editable, onNewSector, onMoveCrag, onAreaEdited }: BodyProps) {
+  const [editingArea, setEditingArea] = useState(false);
   const name = selection.type === "crag" ? selection.crag.name : selection.area.name;
   const range = formatGradeRange(selection.type === "crag" ? cragGradeRange(selection.crag) : selection.range);
   return (
     <div className="flex flex-col gap-2">
       <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{KIND_LABEL[selection.type]}</p>
-      <h2 className="pr-6 font-display text-2xl font-extrabold leading-tight tracking-tight">{name}</h2>
+      <h2 className="pr-6 font-display text-2xl font-extrabold leading-tight tracking-tight">
+        {name}
+        {editable && selection.type !== "crag" && (
+          <button type="button" aria-label="Edytuj obszar" onClick={() => setEditingArea(true)} className="ml-2 align-middle text-base text-muted-foreground hover:text-foreground">
+            ✎
+          </button>
+        )}
+      </h2>
       <div className="flex flex-wrap gap-1.5">
         {selection.type === "crag" ? (
           <Chip>{countLabel(selection.crag.route_count, DROGI)}</Chip>
@@ -98,13 +137,34 @@ export function DetailCardBody({ selection, onZoom, onOpenCrag, onSelectCrag }: 
           <Button className="mt-2" onClick={() => onOpenCrag(selection.crag.slug)}>
             Otwórz skałę
           </Button>
+          {editable && onMoveCrag && (
+            <Button variant="outline" onClick={() => onMoveCrag(selection.crag)}>
+              Przesuń na mapie
+            </Button>
+          )}
         </>
       ) : (
         <>
           <AreaCragList crags={selection.crags} onSelect={onSelectCrag} />
+          {editable && selection.type === "sektor" && onMoveCrag && <UnplacedList crags={selection.crags} onPlace={onMoveCrag} />}
           <Button className="mt-2" onClick={() => onZoom(selection.area.bbox)}>
             Przybliż
           </Button>
+          {editable && selection.type === "region" && onNewSector && (
+            <Button variant="outline" onClick={() => onNewSector(selection.area)}>
+              + Nowy sektor
+            </Button>
+          )}
+          {editingArea && (
+            <AreaEditDialog
+              area={selection.area}
+              onClose={() => setEditingArea(false)}
+              onDone={() => {
+                setEditingArea(false);
+                onAreaEdited?.();
+              }}
+            />
+          )}
         </>
       )}
     </div>
@@ -116,7 +176,7 @@ interface CardProps extends Omit<BodyProps, "selection"> {
   onClose: () => void;
 }
 
-export function DetailCard({ selection, onClose, onZoom, onOpenCrag, onSelectCrag }: CardProps) {
+export function DetailCard({ selection, onClose, ...body }: CardProps) {
   const isDesktop = useIsDesktop();
   // Keep the last selection so the phone drawer keeps its content while it animates closed.
   const [lastSelection, setLastSelection] = useState(selection);
@@ -128,7 +188,7 @@ export function DetailCard({ selection, onClose, onZoom, onOpenCrag, onSelectCra
         <button type="button" aria-label="Zamknij" onClick={onClose} className="absolute right-3 top-2 text-lg text-muted-foreground hover:text-foreground">
           ×
         </button>
-        <DetailCardBody selection={selection} onZoom={onZoom} onOpenCrag={onOpenCrag} onSelectCrag={onSelectCrag} />
+        <DetailCardBody selection={selection} {...body} />
       </aside>
     );
   }
@@ -138,7 +198,7 @@ export function DetailCard({ selection, onClose, onZoom, onOpenCrag, onSelectCra
         <DrawerTitle className="sr-only">Szczegóły</DrawerTitle>
         <DrawerDescription className="sr-only">Informacje o wybranym miejscu na mapie</DrawerDescription>
         <div className="overflow-y-auto">
-          {lastSelection && <DetailCardBody selection={lastSelection} onZoom={onZoom} onOpenCrag={onOpenCrag} onSelectCrag={onSelectCrag} />}
+          {lastSelection && <DetailCardBody selection={lastSelection} {...body} />}
         </div>
       </DrawerContent>
     </Drawer>

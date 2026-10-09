@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AreaProps, CragProps, RouteOut } from "@/lib/api";
 import { ThemeProvider } from "@/lib/theme";
 import { DetailCard, DetailCardBody } from "@/map/DetailCard";
+import type { Selection } from "@/map/selection";
 
 vi.mock("@/lib/useMediaQuery", () => ({ useIsDesktop: () => false }));
 // vaul unmounts immediately in jsdom (no animations), so render the drawer content unconditionally to check what DetailCard passes to it.
@@ -89,6 +90,56 @@ describe("DetailCardBody", () => {
     expect(props.onOpenCrag).toHaveBeenCalledWith("zabi-kon");
     await userEvent.click(screen.getByRole("button", { name: "Otwórz skałę" }));
     expect(props.onOpenCrag).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("DetailCardBody (edycja)", () => {
+  const regionSelection: Selection = { type: "region", area: region, bands: [1, 1, 1, 1], range: null, crags: [] };
+  const unplaced = { ...crag, id: 8, name: "Komin", needs_location: true };
+  const sectorArea: AreaProps = { ...region, id: 102, name: "Pieninki", kind: "sektor", parent_id: 1 };
+  const sectorSelection: Selection = { type: "sektor", area: sectorArea, bands: [1, 1, 1, 1], range: null, crags: [crag, unplaced] };
+
+  it("zalogowany: region ma przycisk nowego sektora i edycji", async () => {
+    const onNewSector = vi.fn();
+    wrap(<DetailCardBody selection={regionSelection} {...handlers()} editable onNewSector={onNewSector} onMoveCrag={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Edytuj obszar" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "+ Nowy sektor" }));
+    expect(onNewSector).toHaveBeenCalledWith(region);
+  });
+
+  it("zalogowany: sektor pokazuje skały do rozstawienia", async () => {
+    const onMoveCrag = vi.fn();
+    wrap(<DetailCardBody selection={sectorSelection} {...handlers()} editable onNewSector={vi.fn()} onMoveCrag={onMoveCrag} />);
+    expect(screen.getByText("Do rozstawienia: 1")).toBeInTheDocument();
+    const list = screen.getByRole("list", { name: "Do rozstawienia" });
+    expect(within(list).getAllByRole("listitem")).toHaveLength(1);
+    await userEvent.click(within(list).getByRole("button", { name: "Ustaw na mapie" }));
+    expect(onMoveCrag).toHaveBeenCalledWith(unplaced);
+    expect(screen.queryByRole("button", { name: "+ Nowy sektor" })).not.toBeInTheDocument();
+  });
+
+  it("zalogowany: skała ma przycisk przesuwania", async () => {
+    const onMoveCrag = vi.fn();
+    wrap(<DetailCardBody selection={{ type: "crag", crag }} {...handlers()} editable onMoveCrag={onMoveCrag} />);
+    await userEvent.click(screen.getByRole("button", { name: "Przesuń na mapie" }));
+    expect(onMoveCrag).toHaveBeenCalledWith(crag);
+  });
+
+  it("niezalogowany nie widzi przycisków edycji", () => {
+    for (const selection of [regionSelection, sectorSelection, { type: "crag", crag: unplaced } satisfies Selection]) {
+      const view = render(
+        <ThemeProvider>
+          <QueryClientProvider client={new QueryClient()}>
+            <DetailCardBody selection={selection} {...handlers()} onNewSector={vi.fn()} onMoveCrag={vi.fn()} />
+          </QueryClientProvider>
+        </ThemeProvider>,
+      );
+      expect(screen.queryByRole("button", { name: "Edytuj obszar" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "+ Nowy sektor" })).not.toBeInTheDocument();
+      expect(screen.queryByText(/Do rozstawienia/)).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Przesuń na mapie" })).not.toBeInTheDocument();
+      view.unmount();
+    }
   });
 });
 

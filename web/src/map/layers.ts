@@ -22,6 +22,9 @@ export const MAP_COLORS: Record<Theme, MapColors> = {
   dark: { brand: "#E2763A", halo: "#1D1916", ink: "#EDE3D2", surface: "#2E2722" },
 };
 
+/** Crags still waiting to be placed on the map (e.g. after "Zamień w sektor"). */
+export const NEEDS_LOCATION_COLOR = "#E0A100";
+
 export const INTERACTIVE_LAYERS = ["region-points", "sector-fill", "crags-isolated", "crags-loose", "crags-sector"];
 
 const FONT = ["Noto Sans Bold"];
@@ -112,7 +115,7 @@ export function cragLayers(c: MapColors): LayerProps[] {
         filter,
         paint: {
           "circle-radius": e(["interpolate", ["linear"], ["zoom"], 9, 4, 15, 7]),
-          "circle-color": c.brand,
+          "circle-color": e(["case", ["get", "needs_location"], NEEDS_LOCATION_COLOR, c.brand]),
           "circle-stroke-color": c.halo,
           "circle-stroke-width": 1.5,
           "circle-opacity": opacity,
@@ -138,7 +141,35 @@ export function cragLayers(c: MapColors): LayerProps[] {
   });
 }
 
-const FADE_HALF = 0.25;
+/** Accent ring around the crags picked for a new sector (goes into the "crags" source). */
+export function selectedCragLayer(c: MapColors, ids: number[]): LayerProps {
+  return {
+    id: "crag-selected",
+    type: "circle",
+    filter: e(["in", ["get", "id"], ["literal", ids]]),
+    paint: {
+      "circle-radius": e(["interpolate", ["linear"], ["zoom"], 9, 7, 15, 10]),
+      "circle-color": c.ink,
+      "circle-stroke-color": c.brand,
+      "circle-stroke-width": 3,
+    },
+  };
+}
+
+/** Live outline of the new sector (goes into the "edit-hull" source). */
+export function hullLayers(c: MapColors): LayerProps[] {
+  return [
+    { id: "edit-hull-fill", type: "fill", filter: e(["==", ["geometry-type"], "Polygon"]), paint: { "fill-color": c.surface, "fill-opacity": 0.45 } },
+    { id: "edit-hull-line", type: "line", paint: { "line-color": c.brand, "line-width": 1.5, "line-dasharray": [3, 2] } },
+  ];
+}
+
+/** Dashed line from the old place of a moved crag to the new one (goes into the "edit-move" source). */
+export function moveLineLayer(c: MapColors): LayerProps {
+  return { id: "edit-move-line", type: "line", paint: { "line-color": c.brand, "line-width": 2, "line-dasharray": [2, 2] } };
+}
+
+const FADE_HALF =0.25;
 // [fade-in start, fade-out end] per interactive layer; null = no fade on that side.
 const CLICKABLE_RANGE: Record<string, [number | null, number | null]> = {
   "region-points": [null, ZOOM.regionsUntil],

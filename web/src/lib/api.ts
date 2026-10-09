@@ -332,6 +332,7 @@ export const api = {
   sectorHulls: () => getJson<FeatureCollection<Polygon, AreaProps>>("/api/map/areas?kind=sektor&geometry=hull"),
   crags: () => getJson<FeatureCollection<Point, CragProps>>("/api/map/crags"),
   crag: (slug: string) => getJson<CragDetail>(`/api/crags/${encodeURIComponent(slug)}`),
+  area: (slug: string) => getJson<{ description: string | null }>(`/api/areas/${encodeURIComponent(slug)}`),
   me: () => getJson<{ nick: string }>("/api/auth/me"),
   login: (password: string, nick: string) => sendJson<{ nick: string }>("POST", "/api/auth/login", { password, nick }),
   logout: () => sendJson<void>("POST", "/api/auth/logout"),
