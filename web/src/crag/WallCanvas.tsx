@@ -31,7 +31,7 @@ const center = (points: Point[]) => ({
 });
 const spread = ([a, b]: Point[]) => Math.hypot(a.x - b.x, a.y - b.y);
 
-function Mark({ mark, color }: { mark: SceneMark; color: string }) {
+export function Mark({ mark, color }: { mark: SceneMark; color: string }) {
   const common = { x: mark.x, y: mark.y, listening: false };
   switch (mark.kind) {
     case "stanowisko":
