@@ -11,6 +11,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
 from topo.api.app import create_app
+from topo.auth import login_limiter
 from topo.config import get_settings
 from topo.db import get_session
 
@@ -57,3 +58,21 @@ def client(session):
     app.dependency_overrides[get_session] = lambda: session
     with TestClient(app) as test_client:
         yield test_client
+
+
+@pytest.fixture
+def edit_settings(monkeypatch):
+    monkeypatch.setenv("EDIT_PASSWORD", "tajne")
+    monkeypatch.setenv("SECRET_KEY", "klucz-testowy")
+    get_settings.cache_clear()
+    yield get_settings()
+    get_settings.cache_clear()
+
+
+@pytest.fixture
+def editor(client, edit_settings):
+    login_limiter.clear()
+    response = client.post("/api/auth/login", json={"password": "tajne", "nick": "ania"})
+    assert response.status_code == 200
+    yield client
+    login_limiter.clear()
