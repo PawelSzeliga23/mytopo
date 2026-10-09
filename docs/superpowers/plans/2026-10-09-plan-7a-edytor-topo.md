@@ -435,3 +435,17 @@ Zachowanie:
 - [ ] **Step 3: Uruchom** `cd web; npm test`, `npx tsc -b`, `npm run build`, `docker compose run --rm api pytest -q`.
 - [ ] **Step 4: Commit** `feat: zapis topo z edytora (checkpoint, konflikt wersji, logowanie)`
 - [ ] **Step 5:** Dopisz „Wnioski z wykonania” na końcu tego planu (decyzje z oceny w Task 4 i poprawki) i zaktualizuj spec, jeśli użytkownik zmienił decyzję. Poproś użytkownika o przeklikanie całości (zapis, historia, cofnięcie, konflikt w dwóch kartach).
+
+---
+
+## Wnioski z wykonania
+
+- Wykonanie inline (jedna sesja), testy pisane z kodem i uruchamiane raz na koniec zadania.
+- Ocena po Task 4: edytor działa; poprawka — wyjście z edytora cofa w historii przeglądarki, bo „← Mapa” na stronie skały (krok wstecz) wracało do edytora.
+- `visible = kind not in {start, przelot}` (nie tylko przelot): import i widok ukrywają punkty startu; inaczej pierwszy zapis przepisywałby ~10 tys. punktów.
+- Kolor linii (`route_line.color`) ustawiany tylko dla nowych linii i przy zmianie drogi — nieruszone linie z importu nie zmieniają się przy zapisie.
+- Linie dróg dodanych w edytorze mają do zapisu kolor „bez wyceny” (front nie liczy `grade_sort`).
+- Układ komputerowy od 1024 px (jak reszta aplikacji), nie od 768 px.
+- Komentarz do zapisu w małym okienku po kliknięciu „Zapisz” zamiast stałego paska.
+- Autozapis szkicu nigdy go nie usuwa (usuwa go tylko udany zapis albo „Porzuć”), więc „Otwórz najnowszą” po konflikcie zostawia stary szkic do następnej zmiany.
+- Wariant dostaje pierwszy punkt (przelot) w miejscu punktu rozgałęzienia — jak warianty z importu; dzięki temu przesuwa się razem z punktem rodzica.
