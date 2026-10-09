@@ -124,7 +124,7 @@ describe("RouteEditPanel", () => {
 });
 
 describe("RouteList — edycja", () => {
-  const rows = { onWall: [{ route, wallId: null, label: "1" }], other: [] };
+  const rows = { onWall: [{ route, wallId: null, lineId: null, label: "1" }], other: [] };
   const props = { rows, wallNames: new Map<number, string>(), selectedRouteId: null, hoveredRouteId: null, onChoose: vi.fn(), onHover: vi.fn() };
 
   it("✎ i „+ Dodaj drogę” tylko przy editable", async () => {

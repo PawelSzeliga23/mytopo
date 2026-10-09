@@ -67,13 +67,10 @@ export function ChangeEntry({ change, showCrag, onRevert }: Props) {
       {headline ? <div className="ml-2.5 text-xs">{headline}</div> : change.objects.map((object) => <ObjectLines key={`${object.kind}-${object.id}`} object={object} />)}
       {change.reverts_id !== null && <div className="ml-2.5 text-xs text-muted-foreground">cofnięcie zmiany #{change.reverts_id}</div>}
       <div className="mt-1 flex items-center gap-2">
-        {change.reverted_by !== null ? (
-          <span className="text-xs text-muted-foreground">cofnięta przez #{change.reverted_by}</span>
-        ) : (
-          <Button type="button" variant="outline" size="sm" onClick={() => onRevert(change)}>
-            {isRestore(change) ? "↶ Przywróć" : "↶ Cofnij"}
-          </Button>
-        )}
+        {change.reverted_by !== null && <span className="text-xs text-muted-foreground">cofnięta przez #{change.reverted_by}</span>}
+        <Button type="button" variant="outline" size="sm" onClick={() => onRevert(change)}>
+          {isRestore(change) ? "↶ Przywróć" : "↶ Cofnij"}
+        </Button>
         {showCrag && change.crag?.slug && (
           <Button asChild variant="outline" size="sm">
             <Link to={`/skaly/${change.crag.slug}`}>Otwórz skałę</Link>
