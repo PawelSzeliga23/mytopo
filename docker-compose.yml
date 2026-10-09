@@ -25,6 +25,8 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://topo:topo@db:5432/topo}
       TEST_DATABASE_URL: ${TEST_DATABASE_URL:-postgresql+psycopg://topo:topo@db:5432/topo_test}
+      EDIT_PASSWORD: ${EDIT_PASSWORD:-}
+      SECRET_KEY: ${SECRET_KEY:-}
     command: ["sh", "-c", "alembic upgrade head && uvicorn topo.main:app --host 0.0.0.0 --port 8000 --reload"]
     volumes:
       - ./api:/app

@@ -66,3 +66,19 @@ npm install
 npm run dev                     # http://localhost:5173
 npm test                        # testy
 ```
+
+## Edycja
+
+Dane (skały, ściany, drogi, sektory, położenie pinezek) edytują znajomi po zalogowaniu wspólnym hasłem. Przed pierwszym uruchomieniem ustaw w `.env` (wzór w `.env.example`):
+
+```
+EDIT_PASSWORD=wspolne-haslo
+SECRET_KEY=dlugi-losowy-ciag      # np. python -c "import secrets; print(secrets.token_hex(24))"
+```
+
+Bez któregoś z nich edycja jest wyłączona (logowanie zwraca 503). Po zmianie `.env` uruchom `docker compose up -d api`.
+
+- Logowanie: przycisk „✎ Edytuj” w górnym pasku, hasło i nick (podpis w historii); sesja trwa rok. Menu z nickiem: „Zmień nick”, „Wyloguj”.
+- Edytować można skałę i ściany (przycisk „Edytuj skałę”), drogi (✎ w wierszu, „+ Dodaj drogę”), obszary (✎ w karcie regionu), a na mapie przesuwać i dodawać skały oraz tworzyć sektory.
+- Każda zmiana trafia do historii z nickiem i komentarzem: menu „⋯” skały → „Historia” oraz strona „Ostatnie zmiany” (`/zmiany`, także przywracanie usuniętych skał). „↶ Cofnij” cofa jedną zmianę; gdy pola zmieniono później, pokaże się okienko konfliktu. Danych z importu nie cofa się.
+- Test E2E (API na :8000 z `EDIT_PASSWORD=e2e-haslo`, front startuje sam): `cd web; npm run e2e` (pierwszy raz: `npx playwright install chromium`). Test zmienia wycenę pierwszej drogi i cofa ją.

@@ -1,5 +1,5 @@
 import { fileURLToPath, URL } from "node:url";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
@@ -10,5 +10,5 @@ export default defineConfig({
     port: 5173,
     proxy: { "/api": "http://localhost:8000", "/media": "http://localhost:8000" },
   },
-  test: { environment: "jsdom", setupFiles: ["./src/test/setup.ts"], css: false },
+  test: { environment: "jsdom", setupFiles: ["./src/test/setup.ts"], css: false, exclude: [...configDefaults.exclude, "e2e/**"] },
 });

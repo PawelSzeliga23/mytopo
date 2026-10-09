@@ -2,3 +2,5 @@ dist-ssr
 *.local
 *.log
 .DS_Store
+/test-results/
+/playwright-report/
