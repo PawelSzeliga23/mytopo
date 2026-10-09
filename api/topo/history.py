@@ -1,6 +1,7 @@
 """Change history (SQLAlchemy-Continuum): every write is a versioned transaction with an author."""
 
 from collections.abc import Iterable
+from datetime import UTC, datetime
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
@@ -18,6 +19,11 @@ class _TopoTransactionFactory(TransactionFactory):
         transaction = super().create_class(manager)
         transaction.author = sa.Column(sa.String(100))
         transaction.comment = sa.Column(sa.String(500))
+        transaction.reverts_id = sa.Column(sa.BigInteger, index=True)
+        # Continuum's issued_at is a naive DateTime (from TransactionBase); make it timezone-aware in place.
+        issued_at = transaction.__table__.c.issued_at
+        issued_at.type = sa.DateTime(timezone=True)
+        issued_at.default = sa.ColumnDefault(lambda: datetime.now(UTC))
         return transaction
 
 
@@ -50,7 +56,7 @@ class _TopoUnitOfWork(UnitOfWork):
 
 class _AuthorPlugin(Plugin):
     def transaction_args(self, uow, session):
-        return {"author": session.info.get("author"), "comment": session.info.get("comment")}
+        return {"author": session.info.get("author"), "comment": session.info.get("comment"), "reverts_id": session.info.get("reverts_id")}
 
 
 def enable_versioning() -> None:
@@ -59,9 +65,10 @@ def enable_versioning() -> None:
     make_versioned(user_cls=None, plugins=[_AuthorPlugin()])
 
 
-def set_author(session: Session, author: str, comment: str | None = None) -> None:
+def set_author(session: Session, author: str, comment: str | None = None, reverts_id: int | None = None) -> None:
     session.info["author"] = author
     session.info["comment"] = comment
+    session.info["reverts_id"] = reverts_id
 
 
 def transaction_class() -> type:
@@ -74,8 +81,19 @@ def has_manual_version(session: Session, model: type, *conditions) -> bool:
     Conditions are built on the version class columns (``version_class(model)``).
     """
     transaction = transaction_class()
-    manual = sa.or_(transaction.author.is_(None), sa.not_(transaction.author.startswith(IMPORT_AUTHOR_PREFIX)))
-    stmt = sa.select(sa.exists().where(version_class(model).transaction_id == transaction.id, manual, *conditions))
+    version = version_class(model)
+    # A version whose transaction row is gone (left by a rolled-back SAVEPOINT) counts as manual.
+    manual = sa.or_(
+        transaction.id.is_(None), transaction.author.is_(None), sa.not_(transaction.author.startswith(IMPORT_AUTHOR_PREFIX))
+    )
+    stmt = sa.select(
+        sa.exists(
+            sa.select(version.id)
+            .select_from(version)
+            .outerjoin(transaction, version.transaction_id == transaction.id)
+            .where(manual, *conditions)
+        )
+    )
     return bool(session.scalar(stmt))
 
 

@@ -184,3 +184,9 @@ def test_deleting_parent_line_detaches_variant(session):
 
     loaded = session.get(RouteLine, variant.id)
     assert (loaded.parent_line_id, loaded.parent_point_id) == (None, None)
+
+
+def test_crag_needs_location_defaults_false(session):
+    crag = f.crag(session, f.area(session, "Dolina"), "Skała")
+    session.refresh(crag)
+    assert crag.needs_location is False

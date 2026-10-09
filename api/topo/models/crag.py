@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from geoalchemy2 import Geometry, WKBElement
-from sqlalchemy import ForeignKey, Index, String, Text
+from sqlalchemy import Boolean, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -37,6 +37,7 @@ class Crag(SourceMixin, Base):
     surroundings: Mapped[str | None] = mapped_column(String(100))
     description: Mapped[str | None] = mapped_column(Text)
     approach_description: Mapped[str | None] = mapped_column(Text)
+    needs_location: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     area: Mapped["Area"] = relationship(back_populates="crags")
     walls: Mapped[list["Wall"]] = relationship(

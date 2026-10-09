@@ -64,3 +64,34 @@ def test_all_content_models_are_versioned(session):
     for model, expected in [(Area, 1), (Crag, 1), (Wall, 1), (Route, 1), (RouteLine, 1), (LinePoint, 3)]:
         version = version_class(model)
         assert session.scalar(select(func.count()).select_from(version)) == expected, model.__name__
+
+
+def test_orphan_version_counts_as_manual(session):
+    set_author(session, IMPORT_AUTHOR_PREFIX + "portalgorski")
+    crag = f.crag(session, f.area(session, "Dolina"), "Skała")
+    session.commit()
+    CragVersion = version_class(Crag)
+    # A version whose transaction row is gone (left by a rolled-back SAVEPOINT) must not look like import data.
+    session.execute(
+        CragVersion.__table__.insert().values(
+            id=crag.id, transaction_id=999_999, operation_type=1, area_id=crag.area_id, name="x", slug="x",
+            location="SRID=4326;POINT(19.7 50.1)",
+        )
+    )
+    assert is_manually_edited(session, Crag, [crag.id])
+
+
+def test_reverts_id_is_stored(session):
+    set_author(session, "ania", "cofnięcie #5", reverts_id=5)
+    f.area(session, "Dolina")
+    session.commit()
+    tx = session.scalars(select(transaction_class()).order_by(transaction_class().id.desc())).first()
+    assert (tx.author, tx.reverts_id) == ("ania", 5)
+
+
+def test_issued_at_has_timezone(session):
+    set_author(session, "ania")
+    f.area(session, "Dolina")
+    session.commit()
+    tx = session.scalars(select(transaction_class()).order_by(transaction_class().id.desc())).first()
+    assert tx.issued_at.tzinfo is not None

@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     media_url: str = "/media"
     media_root: str = "/data/media"
     cache_dir: str = "/data/cache"
+    edit_password: str | None = None
+    secret_key: str | None = None
 
 
 @lru_cache

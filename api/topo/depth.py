@@ -167,11 +167,15 @@ def select_walls(
     return list(session.scalars(stmt))
 
 
-def set_wall_fields(session: Session, wall: Wall, **values) -> None:
+def update_wall_fields(session: Session, wall_id: int, **values) -> None:
     # Core UPDATE on purpose: depth, segmentation and the 2.5D switch are derived data or display settings,
     # not edits. A Continuum version without an "import:" author would make the importer treat the wall as
-    # manually edited and skip it.
-    session.execute(update(Wall.__table__).where(Wall.__table__.c.id == wall.id).values(**values))
+    # manually edited and skip it. No commit: the caller decides.
+    session.execute(update(Wall.__table__).where(Wall.__table__.c.id == wall_id).values(**values))
+
+
+def set_wall_fields(session: Session, wall: Wall, **values) -> None:
+    update_wall_fields(session, wall.id, **values)
     session.commit()
     session.refresh(wall, list(values))
 

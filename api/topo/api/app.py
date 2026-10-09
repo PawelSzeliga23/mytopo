@@ -10,6 +10,8 @@ from topo.config import get_settings
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    if settings.edit_password and not settings.secret_key:
+        raise RuntimeError("SECRET_KEY jest wymagany, gdy ustawiono EDIT_PASSWORD")
     app = FastAPI(title="Topo API")
     install_error_handlers(app)
 

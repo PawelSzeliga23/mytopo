@@ -1,3 +1,4 @@
+import warnings
 from pathlib import Path
 
 import pytest
@@ -5,12 +6,15 @@ from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import SAWarning
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
 from topo.api.app import create_app
 from topo.config import get_settings
 from topo.db import get_session
+
+warnings.filterwarnings("error", category=SAWarning)
 
 API_DIR = Path(__file__).resolve().parent.parent
 
