@@ -1,4 +1,4 @@
-from typing import Annotated, Any, ClassVar
+from typing import Annotated, Any, ClassVar, Literal
 
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
@@ -91,3 +91,19 @@ class WallPatch(PatchBase):
 
 class DeleteBody(EditBase):
     """DELETE carries the comment in the `?comment=` query parameter."""
+
+
+class AreaCreate(EditBase):
+    kind: Literal["region", "sektor"]
+    parent_id: int
+    name: Name
+    description: str | None = None
+    crag_ids: list[int] | None = None
+
+
+class AreaPatch(PatchBase):
+    _not_null: ClassVar[tuple[str, ...]] = ("name", "parent_id")
+
+    name: Name | None = None
+    description: str | None = None
+    parent_id: int | None = None

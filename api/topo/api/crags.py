@@ -15,6 +15,7 @@ from topo.grades import to_french
 from topo.models import Area, Crag, Route, RouteLine, Wall
 from topo.schemas import CragOut, LineOut, RouteOut, WallOut
 from topo.schemas_edit import CragCreate, CragPatch, DeleteBody, RouteCreate
+from topo.sectors import ToSectorPreview, crag_to_sector, to_sector_preview
 from topo.slugs import unique_slug
 
 router = APIRouter(tags=["crags"])
@@ -185,3 +186,26 @@ def create_route(
     refresh_area_geom(session)
     session.commit()
     return {"id": route.id}
+
+
+@router.get("/{crag_id:int}/to-sector/preview")
+def preview_to_sector(
+    crag_id: int, _nick: str = Depends(current_editor), session: Session = Depends(get_session)
+) -> ToSectorPreview:
+    crag = session.get(Crag, crag_id) or raise_not_found("skała")
+    return to_sector_preview(crag)
+
+
+@router.post("/{crag_id:int}/to-sector")
+def convert_to_sector(
+    crag_id: int, body: DeleteBody, nick: str = Depends(current_editor), session: Session = Depends(get_session)
+) -> dict[str, Any]:
+    crag = session.get(Crag, crag_id) or raise_not_found("skała")
+    start_change(session, nick, body.comment)
+    sector, new_crags = crag_to_sector(session, crag)
+    refresh_area_geom(session)
+    session.commit()
+    return {
+        "sector": {"id": sector.id, "slug": sector.slug},
+        "crags": [{"id": c.id, "slug": c.slug, "name": c.name, "needs_location": c.needs_location} for c in new_crags],
+    }
