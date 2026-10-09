@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, type AreaProps } from "@/lib/api";
 import { useEditorMutation } from "@/lib/session";
+import { AreaSelect } from "./AreaSelect";
 import { nearestSector } from "./geo";
 import type { LngLat } from "./mode";
 
@@ -76,8 +77,6 @@ export function AddCragDialog({ point, regions, sectors, onClose }: Props) {
     },
   );
 
-  const sectorsByRegion = new globalThis.Map<number, AreaProps[]>();
-  for (const sector of sectors) sectorsByRegion.set(sector.parent_id ?? 0, [...(sectorsByRegion.get(sector.parent_id ?? 0) ?? []), sector]);
   const valid = draft.name.trim() !== "" && draft.target !== "" && (draft.target !== NEW_REGION || draft.regionName.trim() !== "");
 
   function submit(event: FormEvent) {
@@ -99,24 +98,9 @@ export function AddCragDialog({ point, regions, sectors, onClose }: Props) {
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="new-crag-area">Region / sektor</Label>
-            <select
-              id="new-crag-area"
-              value={draft.target}
-              onChange={(event) => setDraft({ ...draft, target: event.target.value })}
-              className="h-8 w-full rounded-lg border border-input bg-transparent px-2 text-sm"
-            >
-              {regions.map((region) => (
-                <optgroup key={region.id} label={region.name}>
-                  <option value={region.id}>{region.name} (bezpośrednio w regionie)</option>
-                  {(sectorsByRegion.get(region.id) ?? []).map((sector) => (
-                    <option key={sector.id} value={sector.id}>
-                      {`${region.name} › ${sector.name}`}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
+            <AreaSelect id="new-crag-area" value={draft.target} onChange={(target) => setDraft({ ...draft, target })} regions={regions} sectors={sectors}>
               {regionParent !== null && <option value={NEW_REGION}>+ Nowy region…</option>}
-            </select>
+            </AreaSelect>
           </div>
           {draft.target === NEW_REGION && (
             <div className="flex flex-col gap-1.5">

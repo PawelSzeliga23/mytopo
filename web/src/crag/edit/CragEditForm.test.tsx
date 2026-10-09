@@ -86,6 +86,32 @@ describe("CragEditForm", () => {
     expect(patches).toEqual([{ url: `/api/crags/${crag.id}`, body: { approach_minutes: 50, description: "Stary opis rozszerzony", comment: "poprawki" } }]);
   });
 
+  it("zmiana regionu / sektora wysyła tylko area_id", async () => {
+    const patches: { url: string; body: Record<string, unknown> }[] = [];
+    const area = (id: number, name: string, kind: string, parent_id: number | null) => ({ type: "Feature", geometry: null, properties: { id, name, kind, parent_id } });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string, init?: RequestInit) => {
+        if (url === "/api/auth/me") return Promise.resolve(json({ nick: "ania" }));
+        if (init?.method === "PATCH") {
+          patches.push({ url, body: JSON.parse(String(init.body)) });
+          return Promise.resolve(json({ id: crag.id, changed: [] }));
+        }
+        if (url === "/api/map/areas?kind=region") return Promise.resolve(json({ features: [area(2, "Dolina Kobylańska", "region", 1), area(3, "Dolina Będkowska", "region", 1)] }));
+        if (url.startsWith("/api/map/areas?kind=sektor")) return Promise.resolve(json({ features: [area(10, "Pieninki", "sektor", 3)] }));
+        return Promise.resolve(json(crag));
+      }),
+    );
+    const onDone = vi.fn();
+    renderWith(<CragEditForm crag={crag} onDone={onDone} />);
+    const select = await screen.findByLabelText("Region / sektor");
+    expect(select).toHaveValue("2");
+    await userEvent.selectOptions(select, "10");
+    await userEvent.click(screen.getByRole("button", { name: "Zapisz zmiany (1)" }));
+    await vi.waitFor(() => expect(onDone).toHaveBeenCalled());
+    expect(patches).toEqual([{ url: `/api/crags/${crag.id}`, body: { area_id: 10, comment: null } }]);
+  });
+
   it("Anuluj po zmianach pyta o porzucenie", async () => {
     stubFetch(true);
     const onDone = vi.fn();

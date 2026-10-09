@@ -6,6 +6,8 @@ export const ASPECTS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] as const;
 /** The form's working copy: every value is text (or a list of directions), so inputs stay controlled. */
 export interface CragDraft {
   name: string;
+  /** The id of the region or sector the crag sits in (as text, like a select value). */
+  area_id: string;
   rock_type: string;
   height_min: string;
   height_max: string;
@@ -18,7 +20,7 @@ export interface CragDraft {
   approach_description: string;
 }
 
-export type CragFieldKind = "text" | "number" | "aspects" | "tristate" | "textarea";
+export type CragFieldKind = "area" | "text" | "number" | "aspects" | "tristate" | "textarea";
 
 export interface CragField {
   key: keyof CragDraft;
@@ -32,6 +34,7 @@ export interface CragField {
 /** Order and labels of the crag form. */
 export const CRAG_FIELDS: CragField[] = [
   { key: "name", label: "Nazwa", kind: "text", wide: true },
+  { key: "area_id", label: "Region / sektor", kind: "area", wide: true },
   { key: "rock_type", label: "Rodzaj skały", kind: "text" },
   { key: "height_min", label: "Wysokość od (m)", kind: "number" },
   { key: "height_max", label: "Wysokość do (m)", kind: "number" },
@@ -54,6 +57,7 @@ const inCompassOrder = (aspects: string[]) => ASPECTS.filter((aspect) => aspects
 export function toDraft(crag: CragDetail): CragDraft {
   return {
     name: crag.name,
+    area_id: String(crag.path[crag.path.length - 1]?.id ?? ""),
     rock_type: text(crag.rock_type),
     height_min: num(crag.height_min),
     height_max: num(crag.height_max),
@@ -72,6 +76,7 @@ const numberOrNull = (value: string) => (value.trim() === "" ? null : Number(val
 
 const CONVERT: { [K in keyof CragDraft]: (value: CragDraft[K]) => unknown } = {
   name: (value) => value.trim(),
+  area_id: Number,
   rock_type: orNull,
   height_min: numberOrNull,
   height_max: numberOrNull,

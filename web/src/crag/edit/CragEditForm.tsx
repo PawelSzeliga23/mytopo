@@ -1,11 +1,13 @@
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { api, type CragDetail, type CragPatch } from "@/lib/api";
+import { api, type AreaProps, type CragDetail, type CragPatch } from "@/lib/api";
 import { useEditorMutation } from "@/lib/session";
+import { AreaSelect } from "@/map/edit/AreaSelect";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { ASPECTS, CRAG_FIELDS, draftToPatch, inCompassOrder, toDraft, type CragDraft, type CragField } from "./fields";
 
@@ -14,10 +16,22 @@ interface Props {
   onDone: () => void;
 }
 
-function FieldInput({ field, draft, onChange }: { field: CragField; draft: CragDraft; onChange: (value: CragDraft[keyof CragDraft]) => void }) {
+interface Areas {
+  regions: AreaProps[];
+  sectors: AreaProps[];
+}
+
+function FieldInput({ field, draft, areas, onChange }: { field: CragField; draft: CragDraft; areas: Areas; onChange: (value: CragDraft[keyof CragDraft]) => void }) {
   const id = `crag-${field.key}`;
   const value = draft[field.key];
   switch (field.kind) {
+    case "area":
+      return (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={id}>{field.label}</Label>
+          <AreaSelect id={id} value={value as string} onChange={onChange} regions={areas.regions} sectors={areas.sectors} />
+        </div>
+      );
     case "aspects":
       return (
         <fieldset className="flex flex-wrap gap-1.5">
@@ -84,6 +98,13 @@ export function CragEditForm({ crag, onDone }: Props) {
   const [draft, setDraft] = useState(original);
   const [comment, setComment] = useState("");
   const [confirmLeave, setConfirmLeave] = useState(false);
+  // Same keys as the map, so they are usually cached; the field appears once the lists are there.
+  const regions = useQuery({ queryKey: ["map", "regions"], queryFn: api.regions });
+  const sectors = useQuery({ queryKey: ["map", "sectors"], queryFn: api.sectorHulls });
+  const areas: Areas = {
+    regions: regions.data?.features?.map((feature) => feature.properties) ?? [],
+    sectors: sectors.data?.features?.map((feature) => feature.properties) ?? [],
+  };
   const patch = draftToPatch(original, draft);
   const changed = Object.keys(patch).length;
 
@@ -117,9 +138,9 @@ export function CragEditForm({ crag, onDone }: Props) {
   return (
     <form onSubmit={submit} aria-label="Edycja skały" className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {CRAG_FIELDS.map((field) => (
+        {CRAG_FIELDS.filter((field) => field.kind !== "area" || areas.regions.length > 0).map((field) => (
           <div key={field.key} className={field.wide ? "sm:col-span-2" : undefined}>
-            <FieldInput field={field} draft={draft} onChange={(value) => setDraft((current) => ({ ...current, [field.key]: value }))} />
+            <FieldInput field={field} draft={draft} areas={areas} onChange={(value) => setDraft((current) => ({ ...current, [field.key]: value }))} />
           </div>
         ))}
       </div>
