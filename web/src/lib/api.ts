@@ -304,11 +304,33 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
+/** Body of `PUT /api/walls/{id}/lines`: the whole topo of a photo; saved objects by id, new ones by a client ref. */
+export interface SaveLinesBody {
+  version: number;
+  comment?: string | null;
+  new_routes: { ref: string; name: string; grade: string | null }[];
+  lines: {
+    id?: number;
+    ref?: string;
+    route_id?: number | null;
+    route_ref?: string;
+    sort_order: number;
+    parent?: { line_id?: number; line_ref?: string; point_id?: number; point_ref?: string } | null;
+    points: { id?: number; ref?: string; sort_order: number; x: number; y: number; kind: PointKind }[];
+  }[];
+}
+
+export interface SaveLinesResult {
+  version: number;
+  /** Database id of every object sent with a ref. */
+  ids: Record<string, number>;
+}
+
 export function getJson<T>(path: string): Promise<T> {
   return request<T>(path, { headers: { Accept: "application/json" } });
 }
 
-export function sendJson<T>(method: "POST" | "PATCH" | "DELETE", path: string, body?: unknown): Promise<T> {
+export function sendJson<T>(method: "POST" | "PUT" | "PATCH" | "DELETE", path: string, body?: unknown): Promise<T> {
   return request<T>(path, {
     method,
     credentials: "same-origin",
@@ -344,6 +366,7 @@ export const api = {
   patchRoute: (id: number, patch: RoutePatch) => sendJson<PatchResult>("PATCH", `/api/routes/${id}`, patch),
   deleteRoute: (id: number, comment?: string) => sendJson<void>("DELETE", withComment(`/api/routes/${id}`, comment)),
   patchWall: (id: number, patch: WallPatch) => sendJson<PatchResult>("PATCH", `/api/walls/${id}`, patch),
+  saveWallLines: (id: number, body: SaveLinesBody) => sendJson<SaveLinesResult>("PUT", `/api/walls/${id}/lines`, body),
   deleteWall: (id: number, comment?: string) => sendJson<void>("DELETE", withComment(`/api/walls/${id}`, comment)),
   createArea: (body: AreaCreate) => sendJson<{ id: number; slug: string }>("POST", "/api/areas", body),
   patchArea: (id: number, patch: AreaPatch) => sendJson<PatchResult>("PATCH", `/api/areas/${id}`, patch),
