@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { api, type CragDetail } from "@/lib/api";
+import { useLoginOnUnauthorized } from "@/lib/session";
 import { useIsDesktop } from "@/lib/useMediaQuery";
 import { ChangeEntry } from "./ChangeEntry";
 import { useRevert } from "./useRevert";
@@ -15,18 +16,19 @@ interface Props {
 function HistoryList({ crag }: Pick<Props, "crag">) {
   const { revert, dialog } = useRevert();
   // The import entry is included, greyed out, so the crag's whole story is visible.
-  const { data, error, isPending, hasNextPage, isFetchingNextPage, fetchNextPage } = useInfiniteQuery({
+  const { data, error, isPending, hasNextPage, isFetchingNextPage, fetchNextPage, refetch } = useInfiniteQuery({
     queryKey: ["changes", { crag: crag.id }],
     queryFn: ({ pageParam }) => api.changes({ crag: crag.id, include_import: true, before: pageParam }),
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (page) => page.next_before ?? undefined,
   });
   const items = data?.pages.flatMap((page) => page.items) ?? [];
+  const unauthorized = useLoginOnUnauthorized(error, () => void refetch());
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
       {isPending && <p className="text-sm text-muted-foreground">Wczytywanie…</p>}
-      {error && <p role="alert" className="text-sm">{error.message}</p>}
+      {error && <p role="alert" className="text-sm">{unauthorized ? "Zaloguj się, aby zobaczyć historię." : error.message}</p>}
       {data && items.length === 0 && <p className="text-sm text-muted-foreground">Brak zmian.</p>}
       {items.map((change) => (
         <ChangeEntry key={change.id} change={change} onRevert={revert} />

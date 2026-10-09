@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { LoginDialog } from "@/components/LoginDialog";
 import { api, ApiError } from "@/lib/api";
@@ -109,6 +109,8 @@ export function useEditorMutation<V, R>(fn: (variables: V) => Promise<R>, option
     },
     onSuccess: (result, variables) => {
       for (const queryKey of options.invalidate ?? []) void client.invalidateQueries({ queryKey });
+      // Every editor write is a transaction, so the history lists are stale.
+      void client.invalidateQueries({ queryKey: ["changes"] });
       if (options.successToast !== false) toast.success(options.successToast ?? "Zapisano");
       options.onSuccess?.(result, variables);
     },
@@ -118,4 +120,22 @@ export function useEditorMutation<V, R>(fn: (variables: V) => Promise<R>, option
       toast.error(error.message);
     },
   });
+}
+
+/**
+ * For reads that need a session: on a 401 the session is dropped, the login dialog opens and, once logged in, `retry`
+ * repeats the read. Returns true while the error is a 401, so the caller shows a prompt instead of the raw message.
+ */
+export function useLoginOnUnauthorized(error: Error | null, retry: () => void): boolean {
+  const { requestLogin } = useSession();
+  const client = useQueryClient();
+  const retryRef = useRef(retry);
+  retryRef.current = retry;
+  const unauthorized = error instanceof ApiError && error.status === 401;
+  useEffect(() => {
+    if (!unauthorized) return;
+    client.setQueryData(ME_KEY, null);
+    void requestLogin().then((loggedIn) => loggedIn && retryRef.current());
+  }, [unauthorized, error, client, requestLogin]);
+  return unauthorized;
 }

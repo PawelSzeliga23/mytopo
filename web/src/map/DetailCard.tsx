@@ -147,7 +147,7 @@ export function DetailCardBody({ selection, onZoom, onOpenCrag, onSelectCrag, ed
       ) : (
         <>
           <AreaCragList crags={selection.crags} onSelect={onSelectCrag} />
-          {editable && selection.type === "sektor" && onMoveCrag && <UnplacedList crags={selection.crags} onPlace={onMoveCrag} />}
+          {editable && onMoveCrag && <UnplacedList crags={selection.crags} onPlace={onMoveCrag} />}
           <Button className="mt-2" onClick={() => onZoom(selection.area.bbox)}>
             Przybliż
           </Button>

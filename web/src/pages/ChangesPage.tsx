@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ChangeEntry } from "@/history/ChangeEntry";
 import { useRevert } from "@/history/useRevert";
 import { api, type ChangesQuery } from "@/lib/api";
-import { useSession } from "@/lib/session";
+import { useLoginOnUnauthorized, useSession } from "@/lib/session";
 
 type Filter = "no-import" | "all" | "deleted";
 
@@ -21,13 +21,14 @@ const FILTERS: { value: Filter; label: string; query: Pick<ChangesQuery, "kind" 
 function ChangeList({ filter }: { filter: Filter }) {
   const { revert, dialog } = useRevert();
   const query = FILTERS.find((candidate) => candidate.value === filter)!.query;
-  const { data, error, isPending, hasNextPage, isFetchingNextPage, fetchNextPage } = useInfiniteQuery({
+  const { data, error, isPending, hasNextPage, isFetchingNextPage, fetchNextPage, refetch } = useInfiniteQuery({
     queryKey: ["changes", { filter }],
     queryFn: ({ pageParam }) => api.changes({ ...query, before: pageParam }),
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (page) => page.next_before ?? undefined,
   });
   const items = data?.pages.flatMap((page) => page.items) ?? [];
+  const unauthorized = useLoginOnUnauthorized(error, () => void refetch());
 
   // Load the next page when the end of the list scrolls into view; the button below is the fallback.
   const sentinel = useRef<HTMLDivElement>(null);
@@ -44,7 +45,7 @@ function ChangeList({ filter }: { filter: Filter }) {
   return (
     <div>
       {isPending && <p className="text-muted-foreground">Wczytywanie…</p>}
-      {error && <p role="alert">{error.message}</p>}
+      {error && <p role="alert">{unauthorized ? "Zaloguj się, aby zobaczyć historię." : error.message}</p>}
       {data && items.length === 0 && <p className="text-muted-foreground">Brak zmian.</p>}
       {items.map((change) => (
         <ChangeEntry key={change.id} change={change} showCrag onRevert={revert} />

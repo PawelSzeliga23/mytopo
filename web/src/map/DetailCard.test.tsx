@@ -118,6 +118,11 @@ describe("DetailCardBody (edycja)", () => {
     expect(screen.queryByRole("button", { name: "+ Nowy sektor" })).not.toBeInTheDocument();
   });
 
+  it("zalogowany: region też pokazuje skały do rozstawienia", () => {
+    wrap(<DetailCardBody selection={{ ...regionSelection, crags: [crag, unplaced] }} {...handlers()} editable onMoveCrag={vi.fn()} />);
+    expect(screen.getByText("Do rozstawienia: 1")).toBeInTheDocument();
+  });
+
   it("zalogowany: skała ma przycisk przesuwania", async () => {
     const onMoveCrag = vi.fn();
     wrap(<DetailCardBody selection={{ type: "crag", crag }} {...handlers()} editable onMoveCrag={onMoveCrag} />);

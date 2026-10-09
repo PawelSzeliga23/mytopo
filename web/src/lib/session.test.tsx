@@ -40,8 +40,7 @@ function stubBackend(backend: Backend, override?: Handler) {
   return fetchMock;
 }
 
-function wrap(ui: ReactNode) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function wrap(ui: ReactNode, client = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
@@ -137,6 +136,18 @@ describe("useEditorMutation", () => {
     expect(calls).toHaveLength(2); // the 401 and the retry carry the same body
     expect(calls[0][1]?.body).toBe(calls[1][1]?.body);
     expect(screen.getByLabelText("Nazwa drogi")).toHaveValue("Nowa nazwa");
+  });
+
+  it("po zapisie unieważnia listy historii", async () => {
+    stubBackend({ loggedIn: true, patches: [] });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const user = userEvent.setup();
+    wrap(<EditForm />, client);
+
+    await typeName(user);
+    expect(await screen.findByText("zapisano")).toBeInTheDocument();
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["changes"] });
   });
 
   it("po Anuluj nie ponawia i zostawia wpisane dane", async () => {

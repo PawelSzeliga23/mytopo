@@ -88,9 +88,10 @@ function plural(n: number, one: string, few: string, many: string): string {
 /** A line for transactions that are more than field edits (deleting a crag, turning it into a sector); null otherwise. */
 export function changeHeadline(c: ChangeOut): string | null {
   const count = (kind: ObjectChangeOut["kind"], op: ObjectChangeOut["op"]) => c.objects.filter((o) => o.kind === kind && o.op === op).length;
-  const sectorCreated = c.objects.some((o) => o.kind === "area" && o.op === "created" && o.diffs.some((d) => d.field === "kind" && d.after === "sektor"));
+  const createdKind = (kind: string) => c.objects.some((o) => o.kind === "area" && o.op === "created" && o.diffs.some((d) => d.field === "kind" && d.after === kind));
   const cragDeleted = count("crag", "deleted");
-  if (sectorCreated && cragDeleted) return "Zamieniono skałę w sektor";
+  if (createdKind("sektor") && cragDeleted) return "Zamieniono skałę w sektor";
+  if (createdKind("region") && cragDeleted) return "Zamieniono skałę w region";
   if (cragDeleted) {
     const parts = [plural(count("wall", "deleted"), "ściana", "ściany", "ścian"), plural(count("route", "deleted"), "droga", "drogi", "dróg")];
     return `Usunięto skałę (${parts.join(", ")})`;

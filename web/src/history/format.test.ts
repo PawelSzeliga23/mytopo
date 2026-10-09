@@ -47,6 +47,11 @@ describe("format", () => {
       object("crag", "deleted", "Pieninki"),
     ]);
     expect(changeHeadline(converted)).toBe("Zamieniono skałę w sektor");
+    const intoRegion = change([
+      object("area", "created", "Pieninki", [{ field: "kind", before: null, after: "region" }]),
+      object("crag", "deleted", "Pieninki"),
+    ]);
+    expect(changeHeadline(intoRegion)).toBe("Zamieniono skałę w region");
     expect(changeHeadline(change([object("route", "updated", "Filar")]))).toBeNull();
   });
 
