@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useLocation, useNavigate, useParams } from "react-router";
 import { useStore } from "zustand";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
@@ -65,6 +65,7 @@ type Picker = { mode: "new" } | { mode: "change"; lineKey: string } | null;
 
 function Editor({ crag, wall }: { crag: CragDetail; wall: WallOut }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const desktop = useIsDesktop();
   const { image } = useHtmlImage(wall.image_url);
   const holder = useRef<HTMLDivElement>(null);
@@ -157,7 +158,8 @@ function Editor({ crag, wall }: { crag: CragDetail; wall: WallOut }) {
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  const exit = () => navigate(`/skaly/${crag.slug}`);
+  // Back, not forward: the editor leaves the history, so the crag page's "← Mapa" (history back) reaches the map again.
+  const exit = () => (location.key !== "default" ? navigate(-1) : navigate(`/skaly/${crag.slug}`, { replace: true }));
   const pick = (route: DraftRouteRef) => {
     const store = useEditor.getState();
     if (picker?.mode === "change") store.setRoute(picker.lineKey, route);
