@@ -226,3 +226,48 @@ def test_history_summarises_topo_and_skips_wall(editor, session):
     assert Wall not in {change.model for change in changes}
     listed = editor.get(f"/api/changes?crag={wall.crag_id}").json()["items"][0]
     assert [obj["kind"] for obj in listed["objects"]] == ["topo"]
+
+
+def test_point_added_to_existing_line_is_kept(editor, session):
+    wall, line, *_ = setup_wall(session)
+    body = body_of(wall, line)
+    points = body["lines"][0]["points"]
+    points.insert(1, {"ref": "n1", "sort_order": 1, "x": 0.45, "y": 0.7, "kind": "przelot"})
+    for i, point in enumerate(points):
+        point["sort_order"] = i
+    response = put(editor, wall, body)
+    new_id = response.json()["ids"]["n1"]
+    session.expire_all()
+    assert session.get(LinePoint, new_id) is not None
+    # The next save sends the new point by its id and must be accepted.
+    del points[1]["ref"]
+    points[1]["id"] = new_id
+    points[1]["x"] = 0.46
+    body["version"] = response.json()["version"]
+    second = put(editor, wall, body)
+    assert second.status_code == 200, second.json()
+    assert session.get(LinePoint, new_id).x == 0.46
+
+
+def test_unchanged_imported_sort_order_and_hidden_bolt_stay(editor, session):
+    wall, line, *_ = setup_wall(session)
+    line.sort_order = 10
+    hidden = sorted(line.points, key=lambda p: p.sort_order)[1]
+    hidden.visible = False
+    session.commit()
+    before = tx_count(session)
+    body = body_of(wall, line)
+    body["lines"][0]["sort_order"] = 10
+    assert put(editor, wall, body).json() == {"version": 1, "ids": {}}
+    assert tx_count(session) == before
+    body["lines"][0]["points"][0]["x"] = 0.4
+    put(editor, wall, body)
+    session.expire_all()
+    assert session.get(LinePoint, hidden.id).visible is False
+
+
+def test_deleting_a_route_bumps_wall_version(editor, session):
+    wall, line, a, *_ = setup_wall(session)
+    assert editor.delete(f"/api/routes/{a.id}").status_code == 204
+    session.expire_all()
+    assert session.get(Wall, wall.id).version == 2

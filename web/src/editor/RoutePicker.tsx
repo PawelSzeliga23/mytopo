@@ -21,6 +21,7 @@ interface Props {
 export function RoutePicker({ open, title, routes, onPick, onClose }: Props) {
   const draft = useEditor((s) => s.draft);
   const addRoute = useEditor((s) => s.addRoute);
+  const removeRoute = useEditor((s) => s.removeRoute);
   const [name, setName] = useState("");
   const [grade, setGrade] = useState("");
 
@@ -79,7 +80,7 @@ export function RoutePicker({ open, title, routes, onPick, onClose }: Props) {
         {draft.newRoutes.length > 0 && (
           <ul>
             {draft.newRoutes.map((route) => (
-              <li key={route.key}>
+              <li key={route.key} className="flex items-center">
                 <button
                   type="button"
                   onClick={() => onPick({ routeKey: route.key })}
@@ -87,6 +88,15 @@ export function RoutePicker({ open, title, routes, onPick, onClose }: Props) {
                 >
                   <span className="flex-1 font-display">{route.name}</span>
                   <span className="text-xs text-muted-foreground">nowa · {route.grade ?? "bez wyceny"}</span>
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Usuń nową drogę ${route.name}`}
+                  title="Usuń nową drogę (np. przy złej wycenie)"
+                  onClick={() => removeRoute(route.key)}
+                  className="px-2 text-muted-foreground hover:text-destructive"
+                >
+                  ✕
                 </button>
               </li>
             ))}

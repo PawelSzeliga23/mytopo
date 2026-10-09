@@ -31,6 +31,8 @@ export function Toolbar({ tool, onTool, orientation, onLines }: Props) {
           aria-pressed={tool === item.tool}
           title={`${item.label} (${item.key})`}
           onClick={() => onTool(item.tool)}
+          // Never takes focus: Enter (end line) and Space (pan) must reach the editor, not re-press the button.
+          onMouseDown={(event) => event.preventDefault()}
           className="grid size-10 place-items-center rounded-md border border-border bg-background text-lg aria-pressed:bg-foreground aria-pressed:text-background"
         >
           {item.icon}

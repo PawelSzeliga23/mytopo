@@ -22,6 +22,8 @@ export interface EditorState {
   newLine(route: DraftRouteRef): string;
   newVariant(parent: DraftParent, route: DraftRouteRef): string;
   addRoute(name: string, grade: string | null): string;
+  /** Drops a route added in the editor (e.g. a mistyped grade); its lines are left without a route. */
+  removeRoute(routeKey: string): void;
   setRoute(lineKey: string, route: DraftRouteRef): void;
   moveLine(lineKey: string, delta: -1 | 1): void;
   deleteLine(lineKey: string): void;
@@ -217,6 +219,19 @@ export const useEditor = create<EditorState>()(
           },
         });
         return key;
+      },
+
+      removeRoute(routeKey) {
+        const { draft } = get();
+        set({
+          draft: {
+            ...draft,
+            newRoutes: draft.newRoutes.filter((route) => route.key !== routeKey),
+            lines: draft.lines.map((line) =>
+              line.route && "routeKey" in line.route && line.route.routeKey === routeKey ? { ...line, route: null } : line,
+            ),
+          },
+        });
       },
 
       setRoute(lineKey, route) {

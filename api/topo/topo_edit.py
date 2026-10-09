@@ -1,6 +1,6 @@
 """Saving the topo of one photo from the editor: the whole draft against the database, in one history transaction."""
 
-from collections.abc import Iterable
+
 from dataclasses import dataclass
 from typing import Any
 
@@ -11,7 +11,7 @@ from sqlalchemy_continuum import version_class
 from topo.api.errors import ApiError
 from topo.changes import ObjectChange
 from topo.db import refresh_area_geom
-from topo.editing import apply_fields, apply_grade, delete_line
+from topo.editing import apply_fields, apply_grade, bump_wall_versions, delete_line
 from topo.grades import grade_band
 from topo.models import LinePoint, Route, RouteLine, Wall
 from topo.schemas_edit import LineIn, WallLinesIn
@@ -38,13 +38,6 @@ class SaveResult:
 def line_color(route: Route | None) -> str:
     band = grade_band(route.grade_sort) if route is not None else None
     return UNGRADED_COLOR if band is None else LINE_COLORS[band]
-
-
-def bump_wall_versions(session: Session, wall_ids: Iterable[int]) -> None:
-    """Core UPDATE on purpose: through the ORM, history would show an empty change of the wall."""
-    ids = sorted(set(wall_ids))
-    if ids:
-        session.execute(sa.update(Wall).where(Wall.id.in_(ids)).values(version=Wall.version + 1))
 
 
 def walls_touched(session: Session, changes: list[ObjectChange]) -> set[int]:
@@ -136,6 +129,9 @@ def save_wall_lines(session: Session, wall: Wall, body: WallLinesIn) -> SaveResu
     ids.update({ref: route.id for ref, route in routes_by_ref.items()})
 
     existing_lines = {line.id: line for line in wall.lines}
+    # Taken before anything is added: new points join `line.points` through the relationship and must not count as
+    # saved points missing from the body (they would be deleted again).
+    original_points = {line_id: list(line.points) for line_id, line in existing_lines.items()}
     lines_by_key: dict[str, RouteLine] = {}
     points_by_ref: dict[str, LinePoint] = {}
     points_by_id: dict[int, LinePoint] = {}
@@ -162,6 +158,8 @@ def save_wall_lines(session: Session, wall: Wall, body: WallLinesIn) -> SaveResu
             }  # fmt: skip
             if point_in.id is not None:
                 point = own[point_in.id]
+                if point.kind == point_in.kind:
+                    point_values["visible"] = point.visible  # an imported hidden bolt stays hidden until its kind changes
                 changed += len(apply_fields(point, point_values))
                 kept_points.add(point.id)
                 points_by_id[point.id] = point
@@ -188,7 +186,7 @@ def save_wall_lines(session: Session, wall: Wall, body: WallLinesIn) -> SaveResu
 
     kept_lines = {line_in.id for line_in in body.lines if line_in.id is not None}
     doomed_points = [
-        point for line_id in kept_lines for point in existing_lines[line_id].points if point.id not in kept_points
+        point for line_id in kept_lines for point in original_points[line_id] if point.id not in kept_points
     ]
     if doomed_points:
         doomed_ids = [point.id for point in doomed_points]

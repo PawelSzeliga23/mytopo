@@ -22,7 +22,8 @@ from topo.editing import apply_grade, delete_crag, delete_line, delete_route, de
 from topo.history import current_transaction_id, set_author, transaction_class
 from topo.models import Area, Crag, LinePoint, Route, RouteLine, Wall
 from topo.slugs import unique_slug
-from topo.topo_edit import bump_wall_versions, walls_touched
+from topo.editing import bump_wall_versions
+from topo.topo_edit import walls_touched
 
 Mode = Literal["check", "safe", "all"]
 

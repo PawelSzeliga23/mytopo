@@ -23,6 +23,8 @@ export interface DraftLine {
   route: DraftRouteRef;
   parent: DraftParent | null;
   points: DraftPoint[];
+  /** Saved sort_order (imported photos number 10, 20, 30…); kept on save while the order allows it. */
+  sortOrder?: number | null;
 }
 
 export interface DraftRoute {

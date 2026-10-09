@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { ConfirmDialog } from "@/crag/edit/ConfirmDialog";
 import { wallLabel } from "@/crag/WallThumbnails";
-import { applySaved, clearLocal, countChanges, draftFromWall, loadLocal, saveLocal, toSaveBody } from "@/editor/draft";
+import { applySaved, clearLocal, countChanges, draftFromWall, forgetMissing, loadLocal, saveLocal, toSaveBody } from "@/editor/draft";
 import { ConflictTopoDialog } from "@/editor/ConflictTopoDialog";
 import { draftLabels } from "@/editor/labels";
 import { SaveButton } from "@/editor/SaveBar";
@@ -86,8 +86,10 @@ function Editor({ crag, wall }: { crag: CragDetail; wall: WallOut }) {
       successToast: "Zapisano topo",
       onSuccess: (result, { sent }) => {
         // Checkpoint: real ids into the draft and every undo step, so undo after a save never revives id-less copies.
-        useEditor.getState().rebase((draft) => applySaved(draft, result));
-        setBase(applySaved(sent, result));
+        // Ids of lines and points the save removed are forgotten too, so undoing past the save re-creates them.
+        const saved = applySaved(sent, result);
+        useEditor.getState().rebase((draft) => applySaved(forgetMissing(draft, sent), result));
+        setBase(saved);
         clearLocal(wall.id);
       },
     },
@@ -105,10 +107,25 @@ function Editor({ crag, wall }: { crag: CragDetail; wall: WallOut }) {
       },
     );
   };
+  const latestWall = async () => {
+    const fresh = await client.fetchQuery({ queryKey: ["crag", crag.slug], queryFn: () => api.crag(crag.slug), staleTime: 0 });
+    return { fresh, latest: fresh.walls.find((candidate) => candidate.id === wall.id) ?? null };
+  };
+  // "Nadpisz moją": objects someone else deleted are re-created (their ids become refs), routes that are gone are cleared.
+  const overwrite = async () => {
+    if (!conflict) return;
+    const { comment, current } = conflict;
+    setConflict(null);
+    const { fresh, latest } = await latestWall();
+    if (latest) {
+      const routeIds = new Set(fresh.routes.map((route) => route.id));
+      useEditor.getState().rebase((draft) => forgetMissing(draft, draftFromWall(latest), routeIds));
+    }
+    submit(comment, latest?.version ?? current);
+  };
   const openLatest = async () => {
     setConflict(null);
-    const fresh = await client.fetchQuery({ queryKey: ["crag", crag.slug], queryFn: () => api.crag(crag.slug), staleTime: 0 });
-    const latest = fresh.walls.find((candidate) => candidate.id === wall.id);
+    const { latest } = await latestWall();
     if (!latest) return;
     const draftNow = draftFromWall(latest);
     setBase(draftNow);
@@ -186,6 +203,8 @@ function Editor({ crag, wall }: { crag: CragDetail; wall: WallOut }) {
       } else if (!ctrl && SHORTCUTS[key]) {
         chooseTool(SHORTCUTS[key]);
       } else if (event.key === "Enter" || event.key === "Escape") {
+        // Otherwise a focused toolbar button would also "click" on Enter and switch the tool back.
+        event.preventDefault();
         if (tool !== "select") setTool("select");
         else if (event.key === "Escape") useEditor.getState().select(null, null);
       } else if (event.key === "Delete" || event.key === "Backspace") {
@@ -368,10 +387,7 @@ function Editor({ crag, wall }: { crag: CragDetail; wall: WallOut }) {
       <ConflictTopoDialog
         open={conflict !== null}
         onOpenLatest={() => void openLatest()}
-        onOverwrite={() => {
-          if (conflict) submit(conflict.comment, conflict.current);
-          setConflict(null);
-        }}
+        onOverwrite={() => void overwrite()}
         onCancel={() => setConflict(null)}
       />
     </div>

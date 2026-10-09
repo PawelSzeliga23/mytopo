@@ -48,7 +48,8 @@ def remove_wall(
 def put_wall_lines(
     wall_id: int, body: WallLinesIn, nick: str = Depends(current_editor), session: Session = Depends(get_session)
 ) -> Any:
-    wall = session.get(Wall, wall_id) or raise_not_found("ściana")
+    # Locked until commit: two saves at the same moment are serialised, so the second one sees the new version (409).
+    wall = session.get(Wall, wall_id, with_for_update=True) or raise_not_found("ściana")
     start_change(session, nick, body.comment)
     try:
         result = save_wall_lines(session, wall, body)

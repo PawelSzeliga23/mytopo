@@ -67,8 +67,10 @@ export function EditorCanvas({ image, routes, size, tool, detach, onVariantStart
 
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
-      if (event.code === "Space" && !(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement))
-        spaceDown.current = true;
+      if (event.code !== "Space" || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      spaceDown.current = true;
+      // Space+drag pans; it must not also press a focused button (e.g. reopen the route picker).
+      if (event.target instanceof HTMLButtonElement) event.preventDefault();
     };
     const up = (event: KeyboardEvent) => {
       if (event.code === "Space") spaceDown.current = false;

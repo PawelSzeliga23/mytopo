@@ -15,6 +15,8 @@ vi.mock("@/lib/useMediaQuery", () => ({ useIsDesktop: () => true, useMediaQuery:
 
 const wall = makeWall(5, [ln(1, 0, 1, [pt(10, 0.1, 0.9, "start"), pt(11, 0.2, 0.5), pt(12, 0.3, 0.1, "stanowisko")])], { version: 3 });
 const crag = makeCrag([wall], [makeRoute(1, "Rysa")]);
+// What GET /api/crags returns; a test can swap it to simulate someone else's save.
+let served = crag;
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 
 type Reply = (body: Record<string, unknown>) => Response;
@@ -35,7 +37,7 @@ function stubFetch(replies: Reply[], loggedIn = true) {
         puts.push(body);
         return Promise.resolve(replies[puts.length - 1](body));
       }
-      return Promise.resolve(json(crag));
+      return Promise.resolve(json(served));
     }),
   );
   return puts;
@@ -69,7 +71,10 @@ async function editAndSave(comment = "") {
   return key;
 }
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  served = crag;
+});
 afterEach(() => vi.unstubAllGlobals());
 
 describe("saving the topo", () => {
@@ -101,7 +106,10 @@ describe("saving the topo", () => {
 
   it("offers to overwrite after a version conflict, then saves with the current version", async () => {
     const puts = stubFetch([
-      () => json({ code: "version_conflict", message: "Ktoś zapisał topo w międzyczasie", current_version: 7 }, 409),
+      () => {
+        served = makeCrag([{ ...wall, version: 7 }], crag.routes);
+        return json({ code: "version_conflict", message: "Ktoś zapisał topo w międzyczasie", current_version: 7 }, 409);
+      },
       () => json({ version: 8, ids: {} }),
     ]);
     renderEditor();

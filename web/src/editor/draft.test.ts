@@ -1,5 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { applySaved, clearLocal, countChanges, draftFromWall, draftKey, loadLocal, saveLocal, toSaveBody } from "@/editor/draft";
+import {
+  applySaved,
+  clearLocal,
+  countChanges,
+  draftFromWall,
+  draftKey,
+  forgetMissing,
+  loadLocal,
+  saveLocal,
+  sortOrders,
+  toSaveBody,
+} from "@/editor/draft";
 import type { Draft } from "@/editor/types";
 import type { WallOut } from "@/lib/api";
 
@@ -199,5 +210,33 @@ describe("local drafts", () => {
       throw new Error("QuotaExceeded");
     });
     expect(() => saveLocal(editedDraft())).not.toThrow();
+  });
+});
+
+describe("review fixes", () => {
+  it("keeps imported sort orders and numbers new lines in between", () => {
+    const base = draftFromWall({ ...wall, lines: wall.lines.map((l, i) => ({ ...l, sort_order: (i + 1) * 10 })) } as WallOut);
+    expect(sortOrders(base)).toEqual([10, 20]);
+    const inserted = { ...base, lines: [base.lines[0], { key: "n1", id: null, route: null, parent: null, points: [] }, base.lines[1]] };
+    expect(sortOrders(inserted)).toEqual([10, 11, 20]);
+    const swapped = { ...base, lines: [base.lines[1], base.lines[0]] };
+    expect(sortOrders(swapped)).toEqual([20, 21]);
+    expect(toSaveBody(base, null).lines.map((l) => l.sort_order)).toEqual([10, 20]);
+  });
+
+  it("does not send or count new routes no line uses", () => {
+    const draft = { ...draftFromWall(wall), newRoutes: [{ key: "n1", name: "Zła", grade: "VI.x" }] };
+    expect(toSaveBody(draft, null).new_routes).toEqual([]);
+    expect(countChanges(draftFromWall(wall), draft)).toBe(0);
+  });
+
+  it("turns ids the database no longer has into refs and clears routes that are gone", () => {
+    const saved = draftFromWall(wall);
+    const withoutSecond = { ...saved, lines: [saved.lines[0]] };
+    const forgotten = forgetMissing(saved, withoutSecond, new Set([2]));
+    expect(forgotten.lines[0]).toMatchObject({ id: 20, route: null });
+    expect(forgotten.lines[1]).toMatchObject({ key: "l21", id: null, route: { routeId: 2 } });
+    expect(forgotten.lines[1].points.every((p) => p.id === null)).toBe(true);
+    expect(toSaveBody(forgotten, null).lines[1]).toMatchObject({ ref: "l21" });
   });
 });

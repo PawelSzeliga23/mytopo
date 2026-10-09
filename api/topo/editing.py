@@ -6,7 +6,7 @@ from typing import Any
 
 from geoalchemy2 import WKTElement
 from geoalchemy2.shape import to_shape
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from topo.api.errors import ApiError
@@ -68,11 +68,20 @@ def _delete_lines(session: Session, lines: list[RouteLine]) -> None:
         session.delete(line)
 
 
+def bump_wall_versions(session: Session, wall_ids: Iterable[int]) -> None:
+    """Tell open topo editors the photo's lines changed. Core UPDATE on purpose: through the ORM, history would show
+    an empty change of the wall."""
+    ids = sorted(set(wall_ids))
+    if ids:
+        session.execute(update(Wall).where(Wall.id.in_(ids)).values(version=Wall.version + 1))
+
+
 # Deletes go through the ORM (never DB cascades) so that Continuum writes a version row for every removed record.
 def delete_route(session: Session, route: Route) -> None:
     lines = list(session.scalars(select(RouteLine).where(RouteLine.route_id == route.id)))
     _delete_lines(session, lines)
     session.delete(route)
+    bump_wall_versions(session, [line.wall_id for line in lines])
 
 
 def delete_line(session: Session, line: RouteLine) -> None:

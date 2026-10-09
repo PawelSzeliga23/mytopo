@@ -143,3 +143,13 @@ describe("editor store", () => {
     expect(line(key).id).toBe(50);
   });
 });
+
+describe("routes added in the editor", () => {
+  it("can be removed, leaving their lines without a route", () => {
+    const routeKey = state().addRoute("Zła", "VI.x");
+    const key = state().newLine({ routeKey });
+    state().removeRoute(routeKey);
+    expect(state().draft.newRoutes).toEqual([]);
+    expect(line(key).route).toBeNull();
+  });
+});

@@ -6,7 +6,7 @@ from geoalchemy2 import WKBElement
 from sqlalchemy.orm import Session
 
 from topo.api.errors import ApiError
-from topo.editing import delete_crag
+from topo.editing import bump_wall_versions, delete_crag
 from topo.models import Area, Crag, Route, Wall
 from topo.slugs import unique_slug
 
@@ -126,6 +126,8 @@ def crag_to_sector(session: Session, crag: Crag) -> tuple[Area, list[Crag]]:
                     line.route = copy
     for wall in walls:
         wall.crag = by_wall[wall.id]
+    # Lines on later walls now point at route copies: open topo editors of these photos must reload.
+    bump_wall_versions(session, [wall.id for wall in walls])
     session.flush()
     session.expire(crag)
     delete_crag(session, crag)
