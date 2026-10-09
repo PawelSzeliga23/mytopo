@@ -51,8 +51,8 @@ export default function CragPage() {
   const rows = useMemo(() => (crag ? routeRows(crag, wall?.id ?? null) : { onWall: [], other: [] }), [crag, wall]);
   const wallNames = useMemo(() => new Map((crag?.walls ?? []).map((candidate, index) => [candidate.id, wallLabel(candidate, index)])), [crag]);
 
-  // Named after the wall, or "Ściana n"; a lone unnamed wall needs no caption.
-  const wallCaption = wall && crag && (wall.name ?? (crag.walls.length > 1 ? `Ściana ${crag.walls.indexOf(wall) + 1}` : null));
+  // Named after the wall, or "Zdjęcie n"; a lone unnamed wall needs no caption.
+  const wallCaption = wall && crag && (crag.walls.length > 1 || wall.name ? wallLabel(wall, crag.walls.indexOf(wall)) : null);
 
   function backToMap() {
     // Came from the map: go back, so the map restores its view from the URL. Opened from a link: show the map at this crag.

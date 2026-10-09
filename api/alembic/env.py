@@ -39,6 +39,9 @@ def run_migrations_online() -> None:
         if type_ == "table":
             return name not in skipped
         if type_ == "index" and reflected and compare_to is None:
+            # Created by migration 0005 for the history queries; not declared on the models.
+            if name and name.startswith("ix_") and name.endswith("_version_source"):
+                return False
             return obj.table.name not in skipped
         return True
 

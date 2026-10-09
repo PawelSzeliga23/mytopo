@@ -80,5 +80,6 @@ Bez któregoś z nich edycja jest wyłączona (logowanie zwraca 503). Po zmianie
 
 - Logowanie: przycisk „✎ Edytuj” w górnym pasku, hasło i nick (podpis w historii); sesja trwa rok. Menu z nickiem: „Zmień nick”, „Wyloguj”.
 - Edytować można skałę i ściany (przycisk „Edytuj skałę”), drogi (✎ w wierszu, „+ Dodaj drogę”), obszary (✎ w karcie regionu), a na mapie przesuwać i dodawać skały oraz tworzyć sektory.
+- Za reverse proxy uruchom uvicorn z `--proxy-headers --forwarded-allow-ips=<adres proxy>`, żeby limit prób logowania liczył się osobno dla każdego klienta.
 - Każda zmiana trafia do historii z nickiem i komentarzem: menu „⋯” skały → „Historia” oraz strona „Ostatnie zmiany” (`/zmiany`, także przywracanie usuniętych skał). „↶ Cofnij” cofa jedną zmianę; gdy pola zmieniono później, pokaże się okienko konfliktu. Danych z importu nie cofa się.
 - Test E2E (API na :8000; hasło bierze ze zmiennej `EDIT_PASSWORD` albo z `.env`, front startuje sam): `cd web; npm run e2e` (pierwszy raz: `npx playwright install chromium`). Test zmienia wycenę pierwszej drogi i cofa ją (także po przerwaniu, przez API).

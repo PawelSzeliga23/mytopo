@@ -39,7 +39,7 @@ export function ConflictDialog({ change, conflicts, pending, onCancel, onSafe, o
           <DialogTitle>
             Cofnąć zmianę {change.author} z {formatWhen(change.issued_at)}?
           </DialogTitle>
-          <DialogDescription>To pole zmieniono później:</DialogDescription>
+          <DialogDescription>{conflicts.length === 1 ? "To pole zmieniono później:" : "Te pola zmieniono później:"}</DialogDescription>
         </DialogHeader>
         <ul className="flex max-h-60 flex-col gap-1.5 overflow-y-auto rounded-lg bg-secondary p-2 text-sm">
           {conflicts.map((conflict, index) => (

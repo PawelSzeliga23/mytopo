@@ -21,7 +21,7 @@ def upgrade() -> None:
     op.add_column("transaction", sa.Column("reverts_id", sa.BigInteger(), nullable=True))
     op.create_index("ix_transaction_reverts_id", "transaction", ["reverts_id"])
     op.add_column("crag", sa.Column("needs_location", sa.Boolean(), nullable=False, server_default="false"))
-    op.add_column("crag_version", sa.Column("needs_location", sa.Boolean(), nullable=True))
+    op.add_column("crag_version", sa.Column("needs_location", sa.Boolean(), nullable=True, server_default="false"))
     for table in TABLES:
         op.create_index(f"ix_{table}_version_source", f"{table}_version", ["source", "source_id"])
 

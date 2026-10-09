@@ -134,9 +134,9 @@ describe("CragPage", () => {
     expect(screen.getByTestId("wall-caption")).toHaveTextContent("Brzuchata Turniczka · Prawa ściana");
   });
 
-  it("ściana bez nazwy dostaje numer w podpisie", async () => {
+  it("zdjęcie bez nazwy dostaje numer w podpisie", async () => {
     renderAt(makeCrag([makeWall(20, [], {}), makeWall(21, [], { name: "Druga" })], routes));
-    expect(await screen.findByTestId("wall-caption")).toHaveTextContent("Brzuchata Turniczka · Ściana 1");
+    expect(await screen.findByTestId("wall-caption")).toHaveTextContent("Brzuchata Turniczka · Zdjęcie 1");
   });
 
   it("pojedyncza ściana bez nazwy: brak podpisu", async () => {

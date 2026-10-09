@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -24,6 +25,7 @@ interface Props {
 
 export function CragMenu({ crag, wall, onHistory }: Props) {
   const navigate = useNavigate();
+  const client = useQueryClient();
   const [open, setOpen] = useState<Open>(null);
   const close = () => setOpen(null);
   const mapAtCrag = formatViewHash({ longitude: crag.lng, latitude: crag.lat, zoom: CRAG_ZOOM });
@@ -35,6 +37,8 @@ export function CragMenu({ crag, wall, onHistory }: Props) {
     onSuccess: () => {
       close();
       navigate(`/${mapAtCrag}`);
+      // After the page has gone, so Back does not show the deleted crag from cache.
+      setTimeout(() => client.removeQueries({ queryKey: ["crag", crag.slug] }), 0);
       toast.success(`Usunięto ${crag.name}`);
     },
   });
