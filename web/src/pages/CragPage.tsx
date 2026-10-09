@@ -4,13 +4,17 @@ import { useLocation, useNavigate, useParams } from "react-router";
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
+import { Button } from "@/components/ui/button";
 import { CragInfo } from "@/crag/CragInfo";
+import { CragEditForm } from "@/crag/edit/CragEditForm";
+import { CragMenu } from "@/crag/edit/CragMenu";
 import { RouteList } from "@/crag/RouteList";
 import { routeRows, type RouteRow } from "@/crag/topo";
 import { compactSpacer, phoneViewerHeight, useCompactOnScroll } from "@/crag/useCompactOnScroll";
 import { WallThumbnails, wallLabel } from "@/crag/WallThumbnails";
 import { WallViewer } from "@/crag/WallViewer";
 import { api, ApiError } from "@/lib/api";
+import { useSession } from "@/lib/session";
 import { useIsDesktop } from "@/lib/useMediaQuery";
 import { formatViewHash } from "@/map/view";
 
@@ -22,6 +26,8 @@ export default function CragPage() {
   const location = useLocation();
   const isDesktop = useIsDesktop();
   const compact = useCompactOnScroll(!isDesktop);
+  const { isEditor } = useSession();
+  const [editing, setEditing] = useState(false);
   const { data: crag, error, isPending } = useQuery({ queryKey: ["crag", slug], queryFn: () => api.crag(slug) });
   const [wallId, setWallId] = useState<number | null>(null);
   const [selectedRouteId, setSelectedRouteId] = useState<number | null>(null);
@@ -84,7 +90,19 @@ export default function CragPage() {
                   </Fragment>
                 ))}
               </nav>
-              <h1 className="font-display text-4xl font-extrabold tracking-tight">{crag.name}</h1>
+              {!editing && (
+                <div className="flex items-start justify-between gap-2">
+                  <h1 className="font-display text-4xl font-extrabold tracking-tight">{crag.name}</h1>
+                  {isEditor && (
+                    <div className="flex shrink-0 items-center gap-1.5 pt-1.5">
+                      <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                        ✎ Edytuj skałę
+                      </Button>
+                      <CragMenu crag={crag} wall={wall} />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             {wall ? (
               <div className="sticky top-0 z-10 -mx-4 bg-background lg:static lg:mx-0">
@@ -106,7 +124,7 @@ export default function CragPage() {
             {crag.walls.length > 1 && <WallThumbnails walls={crag.walls} activeId={wall?.id ?? null} onSelect={setWallId} />}
           </div>
           <div className="flex flex-col gap-4">
-            <CragInfo crag={crag} descriptionOpen={isDesktop} />
+            {editing && isEditor ? <CragEditForm crag={crag} onDone={() => setEditing(false)} /> : <CragInfo crag={crag} descriptionOpen={isDesktop} />}
             <RouteList
               rows={rows}
               wallNames={wallNames}
