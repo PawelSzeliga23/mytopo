@@ -44,8 +44,12 @@ export const CRAG_FIELDS: CragField[] = [
   { key: "approach_description", label: "Dojście", kind: "textarea", wide: true },
 ];
 
+export { inCompassOrder };
+
 const text = (value: string | null) => value ?? "";
 const num = (value: number | null) => (value === null ? "" : String(value));
+
+const inCompassOrder = (aspects: string[]) => ASPECTS.filter((aspect) => aspects.includes(aspect));
 
 export function toDraft(crag: CragDetail): CragDraft {
   return {
@@ -53,7 +57,7 @@ export function toDraft(crag: CragDetail): CragDraft {
     rock_type: text(crag.rock_type),
     height_min: num(crag.height_min),
     height_max: num(crag.height_max),
-    aspects: crag.aspects,
+    aspects: inCompassOrder(crag.aspects),
     formations: crag.formations.join(", "),
     approach_minutes: num(crag.approach_minutes),
     child_friendly: crag.child_friendly === null ? "" : crag.child_friendly ? "tak" : "nie",
@@ -71,7 +75,7 @@ const CONVERT: { [K in keyof CragDraft]: (value: CragDraft[K]) => unknown } = {
   rock_type: orNull,
   height_min: numberOrNull,
   height_max: numberOrNull,
-  aspects: (value) => ASPECTS.filter((aspect) => value.includes(aspect)),
+  aspects: inCompassOrder,
   formations: (value) => value.split(",").map((part) => part.trim()).filter(Boolean),
   approach_minutes: numberOrNull,
   child_friendly: (value) => (value === "" ? null : value === "tak"),

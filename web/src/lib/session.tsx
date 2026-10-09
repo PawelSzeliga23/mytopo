@@ -9,6 +9,8 @@ const ME_KEY = ["me"] as const;
 interface Session {
   nick: string | null;
   isEditor: boolean;
+  /** The login dialog is open (e.g. after a 401): screens keep what they show so nothing typed is lost. */
+  reauthenticating: boolean;
   login: (password: string, nick: string) => Promise<void>;
   logout: () => Promise<void>;
   /** Opens the login dialog; resolves true once logged in, false when cancelled. */
@@ -62,8 +64,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<Session>(
-    () => ({ nick: me?.nick ?? null, isEditor: !!me, login, logout, requestLogin }),
-    [me, login, logout, requestLogin],
+    () => ({ nick: me?.nick ?? null, isEditor: !!me, reauthenticating: dialogOpen, login, logout, requestLogin }),
+    [me, dialogOpen, login, logout, requestLogin],
   );
 
   return (
@@ -83,6 +85,8 @@ export function useSession(): Session {
 interface EditorMutationOptions<V, R> {
   onSuccess?: (result: R, variables: V) => void;
   invalidate?: QueryKey[];
+  /** Success toast; false when the caller shows its own. */
+  successToast?: string | false;
 }
 
 /**
@@ -105,7 +109,7 @@ export function useEditorMutation<V, R>(fn: (variables: V) => Promise<R>, option
     },
     onSuccess: (result, variables) => {
       for (const queryKey of options.invalidate ?? []) void client.invalidateQueries({ queryKey });
-      toast.success("Zapisano");
+      if (options.successToast !== false) toast.success(options.successToast ?? "Zapisano");
       options.onSuccess?.(result, variables);
     },
     onError: (error) => {

@@ -22,11 +22,11 @@ export function WallEditDialog({ wall, onClose }: { wall: WallOut; onClose: () =
   function submit(event: FormEvent) {
     event.preventDefault();
     const changed = changedFields(original, draft);
-    if (Object.keys(changed).length === 0) return onClose();
     const patch: WallPatch = {};
-    if ("name" in changed) patch.name = draft.name.trim();
+    if ("name" in changed) patch.name = draft.name.trim() === "" ? null : draft.name.trim();
     if ("description" in changed) patch.description = draft.description.trim() === "" ? null : draft.description;
-    if ("sort_order" in changed) patch.sort_order = Number(draft.sort_order);
+    if ("sort_order" in changed && draft.sort_order.trim() !== "") patch.sort_order = Number(draft.sort_order);
+    if (Object.keys(patch).length === 0) return onClose();
     save.mutate(patch);
   }
 

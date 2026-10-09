@@ -164,7 +164,7 @@ export interface RoutePatch {
 }
 
 export interface WallPatch {
-  name?: string;
+  name?: string | null;
   description?: string | null;
   sort_order?: number;
   comment?: string | null;

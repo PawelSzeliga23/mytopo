@@ -26,7 +26,7 @@ export default function CragPage() {
   const location = useLocation();
   const isDesktop = useIsDesktop();
   const compact = useCompactOnScroll(!isDesktop);
-  const { isEditor } = useSession();
+  const { isEditor, reauthenticating } = useSession();
   const [editing, setEditing] = useState(false);
   const { data: crag, error, isPending } = useQuery({ queryKey: ["crag", slug], queryFn: () => api.crag(slug) });
   const [wallId, setWallId] = useState<number | null>(null);
@@ -93,7 +93,7 @@ export default function CragPage() {
               {!editing && (
                 <div className="flex items-start justify-between gap-2">
                   <h1 className="font-display text-4xl font-extrabold tracking-tight">{crag.name}</h1>
-                  {isEditor && (
+                  {(isEditor || reauthenticating) && (
                     <div className="flex shrink-0 items-center gap-1.5 pt-1.5">
                       <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
                         ✎ Edytuj skałę
@@ -124,7 +124,7 @@ export default function CragPage() {
             {crag.walls.length > 1 && <WallThumbnails walls={crag.walls} activeId={wall?.id ?? null} onSelect={setWallId} />}
           </div>
           <div className="flex flex-col gap-4">
-            {editing && isEditor ? <CragEditForm crag={crag} onDone={() => setEditing(false)} /> : <CragInfo crag={crag} descriptionOpen={isDesktop} />}
+            {editing ? <CragEditForm crag={crag} onDone={() => setEditing(false)} /> : <CragInfo crag={crag} descriptionOpen={isDesktop} />}
             <RouteList
               rows={rows}
               wallNames={wallNames}

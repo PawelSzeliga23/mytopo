@@ -110,6 +110,51 @@ describe("CragEditForm", () => {
   });
 });
 
+describe("CragEditForm — wystawa", () => {
+  it("odznaczenie i ponowne zaznaczenie kierunku nie jest zmianą", async () => {
+    stubFetch(true);
+    renderWith(<CragEditForm crag={{ ...crag, aspects: ["N", "S"] }} onDone={vi.fn()} />);
+    await userEvent.click(await screen.findByLabelText("N"));
+    expect(screen.getByRole("button", { name: "Zapisz zmiany (1)" })).toBeEnabled();
+    await userEvent.click(screen.getByLabelText("N"));
+    expect(screen.getByRole("button", { name: "Zapisz zmiany (0)" })).toBeDisabled();
+  });
+});
+
+describe("CragPage — 401 w trakcie zapisu", () => {
+  it("po zalogowaniu wpisane dane zostają, a ponowiony zapis ma to samo ciało", async () => {
+    let loggedIn = true;
+    const bodies: unknown[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string, init?: RequestInit) => {
+        if (url === "/api/auth/me") return Promise.resolve(loggedIn ? json({ nick: "ania" }) : json({}, 401));
+        if (url === "/api/auth/login") {
+          loggedIn = true;
+          return Promise.resolve(json({ nick: "ania" }));
+        }
+        if (init?.method === "PATCH") {
+          if (!loggedIn) return Promise.resolve(json({ code: "unauthorized", message: "Zaloguj się" }, 401));
+          bodies.push(JSON.parse(String(init.body)));
+          return Promise.resolve(json({ id: crag.id, changed: [] }));
+        }
+        return Promise.resolve(json(crag));
+      }),
+    );
+    renderWith(<CragPage />);
+    await userEvent.click(await screen.findByRole("button", { name: "✎ Edytuj skałę" }));
+    await userEvent.type(screen.getByLabelText("Opis"), " nowy");
+    await userEvent.type(screen.getByLabelText("Komentarz"), "komentarz");
+    loggedIn = false; // the session expires
+    await userEvent.click(screen.getByRole("button", { name: "Zapisz zmiany (1)" }));
+    await userEvent.type(await screen.findByLabelText("Hasło"), "sekret");
+    await userEvent.type(screen.getByLabelText(/Twój nick/), "ania");
+    await userEvent.click(screen.getByRole("button", { name: "Wejdź" }));
+    await vi.waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toEqual({ description: "Stary opis nowy", comment: "komentarz" });
+  });
+});
+
 describe("CragPage — edycja", () => {
   it("niezalogowany nie widzi „Edytuj skałę” ani menu", async () => {
     stubFetch(false);

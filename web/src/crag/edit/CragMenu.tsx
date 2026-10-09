@@ -31,6 +31,7 @@ export function CragMenu({ crag, wall, onHistory }: Props) {
   const deleteWall = useEditorMutation(() => api.deleteWall(wall!.id), { invalidate: [["crag", crag.slug], ["map"]], onSuccess: close });
   const deleteCrag = useEditorMutation(() => api.deleteCrag(crag.id), {
     invalidate: [["map"]],
+    successToast: false,
     onSuccess: () => {
       close();
       navigate(`/${mapAtCrag}`);

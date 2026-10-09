@@ -14,6 +14,7 @@ export function ToSectorDialog({ crag, onClose }: { crag: CragDetail; onClose: (
   const preview = useQuery({ queryKey: ["to-sector-preview", crag.id], queryFn: () => api.toSectorPreview(crag.id), retry: false, gcTime: 0 });
   const convert = useEditorMutation(() => api.toSector(crag.id), {
     invalidate: [["map"]],
+    successToast: false,
     onSuccess: () => {
       onClose();
       navigate(`/${formatViewHash({ longitude: crag.lng, latitude: crag.lat, zoom: CRAG_ZOOM })}`);

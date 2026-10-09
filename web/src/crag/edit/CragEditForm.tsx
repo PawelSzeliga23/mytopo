@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { api, type CragDetail, type CragPatch } from "@/lib/api";
 import { useEditorMutation } from "@/lib/session";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { ASPECTS, CRAG_FIELDS, draftToPatch, toDraft, type CragDraft, type CragField } from "./fields";
+import { ASPECTS, CRAG_FIELDS, draftToPatch, inCompassOrder, toDraft, type CragDraft, type CragField } from "./fields";
 
 interface Props {
   crag: CragDetail;
@@ -28,7 +28,7 @@ function FieldInput({ field, draft, onChange }: { field: CragField; draft: CragD
                 type="checkbox"
                 className="sr-only"
                 checked={draft.aspects.includes(aspect)}
-                onChange={(event) => onChange(event.target.checked ? [...draft.aspects, aspect] : draft.aspects.filter((item) => item !== aspect))}
+                onChange={(event) => onChange(inCompassOrder(event.target.checked ? [...draft.aspects, aspect] : draft.aspects.filter((item) => item !== aspect)))}
               />
               {aspect}
             </label>
@@ -79,7 +79,8 @@ function FieldInput({ field, draft, onChange }: { field: CragField; draft: CragD
 /** Edit mode of the whole crag (mockup variant B): all fields at once, one history entry for the whole session. */
 export function CragEditForm({ crag, onDone }: Props) {
   const navigate = useNavigate();
-  const original = useMemo(() => toDraft(crag), [crag]);
+  // Frozen at the start of editing: a background refetch must not make untouched fields look changed.
+  const [original] = useState(() => toDraft(crag));
   const [draft, setDraft] = useState(original);
   const [comment, setComment] = useState("");
   const [confirmLeave, setConfirmLeave] = useState(false);
