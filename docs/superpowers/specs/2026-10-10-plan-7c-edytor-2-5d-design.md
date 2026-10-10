@@ -31,7 +31,7 @@ Zalogowani poprawiają model 2.5D ściany tam, gdzie głębia albo segmentacja s
 ## 4. API
 
 - `WallOut` dostaje: `rock_color`, `ground_color`, `depth_enabled` (bool | null), `model_version` (n | null), `original_depth_url`, `original_segments_url`. `depth_url` i `segments_url` wskazują model, gdy `model_path` jest ustawione (i głębia gotowa), inaczej oryginały jak dotąd.
-- `PUT /api/walls/{id}/model` (multipart, zalogowany): `base_model` (wersja modelu, od której edytor zaczął: liczba albo pusty = oryginał), opcjonalnie pliki `depth` i `segments` (zawsze oba albo żaden), `rock_color`, `ground_color` (`#rrggbb` albo pusty = domyślny), `depth_enabled` (`auto` | `on` | `off`), `comment`.
+- `PUT /api/walls/{id}/model` (multipart, zalogowany): `base_model` (wersja modelu, od której edytor zaczął: liczba albo pusty = oryginał), opcjonalnie pliki `depth` i `segments` (zawsze oba albo żaden), `rock_color`, `ground_color` (`#rrggbb` albo `default` = domyślny), `depth_enabled` (`auto` | `on` | `off`), `comment`.
   - Ściana bez gotowej głębi → 422 `no_depth`.
   - `base_model` ≠ bieżące `model_version` → 409 `model_conflict` z `current_model`.
   - Pliki: PNG, rozmiar = oryginał, `depth` 16-bit jednokanałowy, `segments` 8-bit jednokanałowy z wartościami 0–4; inaczej 422 `invalid_model`. Do 30 MB razem.

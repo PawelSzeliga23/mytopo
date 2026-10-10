@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Form, Query, Response, UploadFile
 from fastapi.responses import JSONResponse
@@ -9,9 +9,10 @@ from topo.api.deps import current_editor, start_change
 from topo.api.errors import ApiError, raise_not_found
 from topo.config import get_settings
 from topo.db import get_session
-from topo.depth import update_wall_fields
+from topo.depth import model_number, update_wall_fields
 from topo.depth_queue import enqueue_depth
 from topo.editing import apply_fields, delete_wall
+from topo.model_edit import MAX_MODEL_UPLOAD, InvalidModel, check_model, original_size, store_model
 from topo.models import Wall
 from topo.photos import read_upload, set_photo
 from topo.schemas_edit import DeleteBody, WallLinesIn, WallPatch
@@ -99,3 +100,60 @@ def retry_depth(
     enqueue_depth(session, wall.id)
     session.commit()
     return {"queued": True}
+
+
+Color = Annotated[str | None, Form(pattern=r"^(#[0-9a-fA-F]{6}|default)$")]  # "default": back to the default colour
+SWITCH = {"auto": None, "on": True, "off": False}
+
+
+@router.put("/{wall_id:int}/model", response_model=None)
+def save_model(
+    wall_id: int,
+    base_model: Annotated[str, Form(pattern=r"^\d*$")] = "",
+    depth: UploadFile | None = None,
+    segments: UploadFile | None = None,
+    rock_color: Color = None,
+    ground_color: Color = None,
+    depth_enabled: Annotated[Literal["auto", "on", "off"] | None, Form()] = None,
+    comment: Annotated[str | None, Form(max_length=500)] = None,
+    nick: str = Depends(current_editor),
+    session: Session = Depends(get_session),
+) -> Any:
+    """The 2.5D model edited by hand (both rasters, or none) and the wall's hologram colours and 2.5D switch."""
+    # Locked until commit: two saves at the same moment get model numbers in turn and the second one a conflict.
+    wall = session.get(Wall, wall_id, with_for_update=True) or raise_not_found("ściana")
+    if wall.depth_status != "ready" or wall.depth_path is None:
+        raise ApiError(422, "no_depth", "Ta ściana nie ma jeszcze modelu 2.5D")
+    current = model_number(wall.model_path)
+    if (int(base_model) if base_model else None) != current:
+        session.rollback()
+        content = {"code": "model_conflict", "message": "Ktoś zapisał model w międzyczasie", "current_model": current}
+        return JSONResponse(content, status_code=409)
+    media_root = Path(get_settings().media_root)
+    rasters = None
+    if depth is not None or segments is not None:
+        if depth is None or segments is None:
+            raise ApiError(422, "invalid_model", "Wyślij głębię i segmentację razem")
+        rasters = depth.file.read(MAX_MODEL_UPLOAD + 1), segments.file.read(MAX_MODEL_UPLOAD + 1)
+        try:
+            if max(len(data) for data in rasters) > MAX_MODEL_UPLOAD:
+                raise InvalidModel("Pliki modelu są za duże")
+            check_model(*rasters, original_size(media_root, wall))
+        except InvalidModel as exc:
+            raise ApiError(422, "invalid_model", str(exc)) from exc
+    start_change(session, nick, comment)
+    data: dict[str, Any] = {}
+    for name, value in (("rock_color", rock_color), ("ground_color", ground_color)):
+        if value is not None:
+            data[name] = None if value == "default" else value.lower()
+    if depth_enabled is not None:
+        data["depth_enabled"] = SWITCH[depth_enabled]
+    changed = apply_fields(wall, data)
+    if rasters is not None:
+        wall.model_path = store_model(media_root, wall, *rasters)
+        changed.add("model_path")
+    if not changed:
+        session.rollback()
+        return {"model_version": current, "changed": []}
+    session.commit()
+    return {"model_version": model_number(wall.model_path), "changed": sorted(changed)}
