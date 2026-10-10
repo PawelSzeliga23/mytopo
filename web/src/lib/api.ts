@@ -45,6 +45,45 @@ export interface CragProps {
   needs_location: boolean;
 }
 
+/** A crag on an area page (`GET /api/areas/{slug}`), with the sector it lies in when listed on a region page. */
+export interface AreaCrag {
+  id: number;
+  name: string;
+  slug: string;
+  route_count: number;
+  grade_bands: number[];
+  grade_min: string | null;
+  grade_min_sort: number | null;
+  grade_max: string | null;
+  grade_max_sort: number | null;
+  sector_name: string | null;
+  lng: number | null;
+  lat: number | null;
+}
+
+export interface AreaChildOut {
+  id: number;
+  name: string;
+  slug: string;
+  kind: AreaKind;
+  crag_count: number;
+  route_count: number;
+  grade_bands: number[];
+}
+
+export interface AreaDetail {
+  id: number;
+  name: string;
+  slug: string;
+  kind: AreaKind;
+  description: string | null;
+  path: AreaRef[];
+  children: AreaChildOut[];
+  crags: AreaCrag[];
+  center: [number, number] | null;
+  bbox: [number, number, number, number] | null;
+}
+
 export interface AreaRef {
   id: number;
   name: string;
@@ -380,7 +419,7 @@ export const api = {
   sectorHulls: () => getJson<FeatureCollection<Polygon, AreaProps>>("/api/map/areas?kind=sektor&geometry=hull"),
   crags: () => getJson<FeatureCollection<Point, CragProps>>("/api/map/crags"),
   crag: (slug: string) => getJson<CragDetail>(`/api/crags/${encodeURIComponent(slug)}`),
-  area: (slug: string) => getJson<{ description: string | null }>(`/api/areas/${encodeURIComponent(slug)}`),
+  area: (slug: string) => getJson<AreaDetail>(`/api/areas/${encodeURIComponent(slug)}`),
   me: () => getJson<{ nick: string }>("/api/auth/me"),
   login: (password: string, nick: string) => sendJson<{ nick: string }>("POST", "/api/auth/login", { password, nick }),
   logout: () => sendJson<void>("POST", "/api/auth/logout"),

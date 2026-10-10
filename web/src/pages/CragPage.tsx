@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router";
+import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
@@ -106,7 +106,9 @@ export default function CragPage() {
                 {crag.path.map((area) => (
                   <Fragment key={area.id}>
                     {" · "}
-                    <span>{area.name}</span>
+                    <Link to={`/obszary/${area.slug}`} className="uppercase hover:text-foreground">
+                      {area.name}
+                    </Link>
                   </Fragment>
                 ))}
               </nav>

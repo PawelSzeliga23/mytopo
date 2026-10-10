@@ -3,6 +3,8 @@ export type Forms = readonly [one: string, few: string, many: string];
 export const SKALY: Forms = ["skała", "skały", "skał"];
 export const DROGI: Forms = ["droga", "drogi", "dróg"];
 export const SCIANY: Forms = ["ściana", "ściany", "ścian"];
+export const REGIONY: Forms = ["region", "regiony", "regionów"];
+export const SEKTORY: Forms = ["sektor", "sektory", "sektorów"];
 
 export function plural(n: number, [one, few, many]: Forms): string {
   if (n === 1) return one;

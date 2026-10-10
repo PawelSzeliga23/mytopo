@@ -9,6 +9,7 @@ import MapPage from "@/map/MapPage";
 // The crag page (konva, and three.js behind it) loads only when opened, so the map does not carry it.
 const CragPage = lazy(() => import("@/pages/CragPage"));
 const ChangesPage = lazy(() => import("@/pages/ChangesPage"));
+const AreaPage = lazy(() => import("@/pages/AreaPage"));
 const EditorPage = lazy(() => import("@/editor/EditorPage"));
 const ModelEditorPage = lazy(() => import("@/model/ModelEditorPage"));
 
@@ -35,6 +36,14 @@ const router = createBrowserRouter([
     element: (
       <Suspense fallback={<p className="p-4 text-muted-foreground">Wczytywanie…</p>}>
         <ModelEditorPage />
+      </Suspense>
+    ),
+  },
+  {
+    path: "/obszary/:slug",
+    element: (
+      <Suspense fallback={<p className="p-4 text-muted-foreground">Wczytywanie…</p>}>
+        <AreaPage />
       </Suspense>
     ),
   },

@@ -364,6 +364,7 @@ export default function MapPage() {
         onZoom={zoomTo}
         onSelectCrag={selectCrag}
         onOpenCrag={(slug) => navigate(`/skaly/${slug}`)}
+        onOpenArea={(slug) => navigate(`/obszary/${slug}`)}
         editable={editable}
         onNewSector={startSector}
         onMoveCrag={startMove}

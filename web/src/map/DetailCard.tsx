@@ -20,6 +20,8 @@ interface BodyProps {
   selection: Selection;
   onZoom: (bbox: BBox) => void;
   onOpenCrag: (slug: string) => void;
+  /** Opens the page of a region or sector (its crag list); without it the button is hidden. */
+  onOpenArea?: (slug: string) => void;
   onSelectCrag: (crag: CragProps) => void;
   /** Shows the edit controls (logged in, or logging in again). */
   editable?: boolean;
@@ -105,7 +107,7 @@ function UnplacedList({ crags, onPlace }: { crags: CragProps[]; onPlace: (crag: 
   );
 }
 
-export function DetailCardBody({ selection, onZoom, onOpenCrag, onSelectCrag, editable, onNewSector, onMoveCrag, onAreaEdited }: BodyProps) {
+export function DetailCardBody({ selection, onZoom, onOpenCrag, onOpenArea, onSelectCrag, editable, onNewSector, onMoveCrag, onAreaEdited }: BodyProps) {
   const [editingArea, setEditingArea] = useState(false);
   const name = selection.type === "crag" ? selection.crag.name : selection.area.name;
   const range = formatGradeRange(selection.type === "crag" ? cragGradeRange(selection.crag) : selection.range);
@@ -148,9 +150,16 @@ export function DetailCardBody({ selection, onZoom, onOpenCrag, onSelectCrag, ed
         <>
           <AreaCragList crags={selection.crags} onSelect={onSelectCrag} />
           {editable && onMoveCrag && <UnplacedList crags={selection.crags} onPlace={onMoveCrag} />}
-          <Button className="mt-2" onClick={() => onZoom(selection.area.bbox)}>
-            Przybliż
-          </Button>
+          <div className="mt-2 flex gap-2">
+            <Button className="flex-1" onClick={() => onZoom(selection.area.bbox)}>
+              Przybliż
+            </Button>
+            {onOpenArea && (
+              <Button variant="outline" className="flex-1" onClick={() => onOpenArea(selection.area.slug)}>
+                Lista skał
+              </Button>
+            )}
+          </div>
           {editable && selection.type === "region" && onNewSector && (
             <Button variant="outline" onClick={() => onNewSector(selection.area)}>
               + Nowy sektor
