@@ -167,6 +167,15 @@ def select_walls(
     return list(session.scalars(stmt))
 
 
+def model_files(model_path: str) -> tuple[str, str]:
+    """Depth and segmentation of a model edited by hand (paths relative to the media root)."""
+    return f"{model_path}-depth.png", f"{model_path}-segments.png"
+
+
+def model_number(model_path: str | None) -> int | None:
+    return int(model_path.rsplit("-", 1)[1]) if model_path else None
+
+
 def photo_folder(wall: Wall) -> PurePosixPath:
     """Folder of the wall's current photo: its depth map and segmentation are stored next to it."""
     if wall.image_path:

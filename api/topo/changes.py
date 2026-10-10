@@ -18,7 +18,7 @@ KIND = {Area: "area", Crag: "crag", Wall: "wall", Route: "route", RouteLine: "li
 SKIP_FIELDS = frozenset({
     "version", "source", "source_id", "source_url", "grade_sort", "image_original_path", "thumb_path",
     "image_width", "image_height", "depth_path", "depth_status", "depth_model", "vegetation_ratio",
-    "route_vegetation_ratio", "depth_enabled", "needs_location",
+    "route_vegetation_ratio", "needs_location",
 })
 
 Op = Literal["created", "updated", "deleted"]

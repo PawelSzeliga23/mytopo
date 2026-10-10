@@ -50,6 +50,12 @@ class WallOut(BaseModel):
     segments_url: str | None
     show_3d: bool
     vegetation_ratio: float | None
+    depth_enabled: bool | None
+    rock_color: str | None
+    ground_color: str | None
+    model_version: int | None
+    original_depth_url: str | None
+    original_segments_url: str | None
     lines: list[LineOut]
 
 

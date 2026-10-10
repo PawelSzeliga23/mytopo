@@ -36,6 +36,10 @@ class Wall(SourceMixin, Base):
     vegetation_ratio: Mapped[float | None]
     route_vegetation_ratio: Mapped[float | None]
     depth_enabled: Mapped[bool | None]
+    # The 2.5D model edited by hand: "{photo folder}/model-{n}" (files -depth.png, -segments.png); None = as computed.
+    model_path: Mapped[str | None] = mapped_column(String(500))
+    rock_color: Mapped[str | None] = mapped_column(String(7))  # "#rrggbb"; None = the default hologram colour
+    ground_color: Mapped[str | None] = mapped_column(String(7))
 
     crag: Mapped["Crag"] = relationship(back_populates="walls")
     lines: Mapped[list["RouteLine"]] = relationship(

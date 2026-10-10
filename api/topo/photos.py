@@ -42,5 +42,5 @@ def set_photo(session: Session, wall: Wall, data: bytes, media_root: Path) -> No
     wall.image_original_path, wall.image_path, wall.thumb_path = stored.original_path, stored.image_path, stored.thumb_path
     wall.image_width, wall.image_height = stored.width, stored.height
     wall.depth_status, wall.depth_path, wall.depth_model = "pending", None, None
-    wall.vegetation_ratio = wall.route_vegetation_ratio = wall.depth_enabled = None
+    wall.vegetation_ratio = wall.route_vegetation_ratio = wall.depth_enabled = wall.model_path = None
     enqueue_depth(session, wall.id)

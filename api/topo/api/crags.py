@@ -12,7 +12,7 @@ from topo.api.deps import current_editor, start_change
 from topo.api.errors import ApiError, not_found, raise_not_found
 from topo.config import get_settings
 from topo.db import get_session, refresh_area_geom
-from topo.depth import SEGMENTS_FILE, photo_folder, wants_3d
+from topo.depth import SEGMENTS_FILE, model_files, model_number, photo_folder, wants_3d
 from topo.editing import apply_fields, apply_grade, area_kind_ok, delete_crag, location_from, location_of
 from topo.grades import to_french
 from topo.models import Area, Crag, Route, RouteLine, Wall
@@ -26,6 +26,13 @@ router = APIRouter(tags=["crags"])
 
 
 def _wall_out(wall: Wall) -> WallOut:
+    ready = wall.depth_status == "ready"
+    original_depth = media_url(wall.depth_path) if ready else None
+    original_segments = (
+        media_url((photo_folder(wall) / SEGMENTS_FILE).as_posix()) if ready and wall.vegetation_ratio is not None else None
+    )
+    # A model edited by hand replaces both rasters; the originals stay for the editor's "restore" brush.
+    model = model_files(wall.model_path) if ready and wall.model_path else None
     return WallOut(
         id=wall.id,
         name=wall.name,
@@ -36,16 +43,18 @@ def _wall_out(wall: Wall) -> WallOut:
         thumb_url=media_url(wall.thumb_path),
         image_width=wall.image_width,
         image_height=wall.image_height,
-        depth_url=media_url(wall.depth_path) if wall.depth_status == "ready" else None,
+        depth_url=media_url(model[0]) if model else original_depth,
         depth_status=wall.depth_status,
         depth_model=wall.depth_model,
-        segments_url=(
-            media_url((photo_folder(wall) / SEGMENTS_FILE).as_posix())
-            if wall.depth_status == "ready" and wall.vegetation_ratio is not None
-            else None
-        ),
+        segments_url=media_url(model[1]) if model else original_segments,
         show_3d=wants_3d(wall),
         vegetation_ratio=wall.vegetation_ratio,
+        depth_enabled=wall.depth_enabled,
+        rock_color=wall.rock_color,
+        ground_color=wall.ground_color,
+        model_version=model_number(wall.model_path) if model else None,
+        original_depth_url=original_depth,
+        original_segments_url=original_segments,
         lines=[LineOut.model_validate(line) for line in wall.lines],
     )
 
