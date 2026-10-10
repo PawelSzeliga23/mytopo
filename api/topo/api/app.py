@@ -7,6 +7,7 @@ from topo.api import changes as changes_api
 from topo.api import crags as crags_api
 from topo.api import map as map_api
 from topo.api import routes as routes_api
+from topo.api import search as search_api
 from topo.api import walls as walls_api
 from topo.api.errors import install_error_handlers
 from topo.config import get_settings
@@ -30,5 +31,6 @@ def create_app() -> FastAPI:
     app.include_router(crags_api.router, prefix="/api/crags")
     app.include_router(routes_api.router, prefix="/api/routes")
     app.include_router(walls_api.router, prefix="/api/walls")
+    app.include_router(search_api.router, prefix="/api/search")
     app.mount(settings.media_url, StaticFiles(directory=settings.media_root, check_dir=False), name="media")
     return app
