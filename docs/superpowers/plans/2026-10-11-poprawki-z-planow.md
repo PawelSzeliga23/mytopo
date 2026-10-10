@@ -26,3 +26,7 @@ Zbiorcza poprawka drobiazgów z sekcji „Wnioski z wykonania” planów 1–8 (
 
 1. **Kolory hologramu na zdjęciu.** Prototyp (`depth_preview_view.html`, plan 5a) umiał nałożyć kolory skały i podłoża na zdjęcie; w edytorze 2.5D tego brakuje — dodać podgląd „zdjęcie + kolory hologramu”.
 2. **Pędzel „wygładź”.** „Spłaszcz” zostawia nierówności, a „Wygładź” działa dziś na cały model (przycisk). Potrzebny pędzel wygładzający tylko pod kursorem, jeden krok cofania na pociągnięcie, jak pozostałe pędzle.
+
+## Do zrobienia — mapa (od użytkownika, 2026-10-11)
+
+3. **Klik w obwódkę sektora otwiera kartę sektora przy każdym przybliżeniu.** Dziś klikalność sektora zależy od zoomu (`isClickableAt` w `web/src/map/layers.ts`); obrys jest widoczny także przy dużym przybliżeniu, więc kliknięcie w niego (linię obwódki) ma zawsze pokazać kartę sektora.
