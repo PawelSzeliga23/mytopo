@@ -17,7 +17,7 @@ from sqlalchemy_continuum import version_class
 
 from topo.changes import KIND, ObjectChange, transaction_changes, version_values
 from topo.db import refresh_area_geom
-from topo.depth import DEPTH_FILE, SEGMENTS_FILE, update_wall_fields, vegetation_stats
+from topo.depth import DEPTH_FILE, SEGMENTS_FILE, photo_folder, update_wall_fields, vegetation_stats
 from topo.editing import apply_grade, delete_crag, delete_line, delete_route, delete_wall, location_from, location_of
 from topo.history import current_transaction_id, set_author, transaction_class
 from topo.models import Area, Crag, LinePoint, Route, RouteLine, Wall
@@ -305,12 +305,13 @@ def _restore_depth(session: Session, wall_ids: list[int], media_root: Path) -> N
         wall = session.get(Wall, wall_id)
         if wall is None:
             continue
-        folder = media_root / "walls" / str(wall_id)
+        relative = photo_folder(wall)
+        folder = media_root / relative
         values: dict[str, Any] = {
             "depth_status": "pending", "depth_path": None, "vegetation_ratio": None, "route_vegetation_ratio": None,
         }  # fmt: skip
         if (folder / DEPTH_FILE).exists():
-            values.update(depth_status="ready", depth_path=f"walls/{wall_id}/{DEPTH_FILE}")
+            values.update(depth_status="ready", depth_path=(relative / DEPTH_FILE).as_posix())
         if (folder / SEGMENTS_FILE).exists():
             with Image.open(folder / SEGMENTS_FILE) as image:
                 classes = np.array(image)

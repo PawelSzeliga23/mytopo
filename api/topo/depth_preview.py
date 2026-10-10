@@ -10,7 +10,7 @@ from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from topo.depth import GROUND, ROCK, SEGMENTS_FILE, SKY, VEGETATION, VEGETATION_LIMIT, load_depth, wants_3d
+from topo.depth import GROUND, ROCK, SEGMENTS_FILE, SKY, VEGETATION, VEGETATION_LIMIT, load_depth, photo_folder, wants_3d
 from topo.importer.preview import render_wall_preview
 from topo.models import Wall
 
@@ -107,7 +107,7 @@ def write_gallery(walls: list[Wall], media_root: Path, out_dir: Path) -> Path:
         _depth_rgb(depth).save(out_dir / f"{wall.id}-glebia16.png")
         (out_dir / f"{wall.id}-linie.json").write_text(json.dumps(_lines(wall)), encoding="utf-8")
         columns = [("linie", "zdjęcie z liniami")]
-        segments_path = Path(media_root) / "walls" / str(wall.id) / SEGMENTS_FILE
+        segments_path = Path(media_root) / photo_folder(wall) / SEGMENTS_FILE
         if segments_path.exists():
             with Image.open(segments_path) as segments:
                 classes = np.asarray(segments)

@@ -23,16 +23,26 @@ class StoredImage:
     height: int
 
 
-def store_wall_image(media_root: Path, wall_id: int, data: bytes) -> StoredImage:
+def next_photo_number(media_root: Path, wall_id: int) -> int:
+    """Number of the wall's next photo folder (``walls/{id}/{n}/``); imported photos lie in ``walls/{id}/`` itself."""
+    folder = Path(media_root) / "walls" / str(wall_id)
+    numbers = [int(p.name) for p in folder.iterdir() if p.is_dir() and p.name.isdigit()] if folder.is_dir() else []
+    return max(numbers, default=0) + 1
+
+
+def store_wall_image(media_root: Path, wall_id: int, data: bytes, number: int | None = None) -> StoredImage:
+    """Stores the photo in ``walls/{id}/`` (import) or, with ``number``, in its own folder ``walls/{id}/{number}/``."""
     try:
         image = Image.open(io.BytesIO(data))
         image.load()
-    except (UnidentifiedImageError, OSError) as exc:
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as exc:
         raise InvalidImage("Nieprawidłowy plik obrazu") from exc
     extension = {"JPEG": "jpg"}.get(image.format or "", (image.format or "img").lower())
     image = ImageOps.exif_transpose(image).convert("RGB")
 
     relative = Path("walls") / str(wall_id)
+    if number is not None:
+        relative = relative / str(number)
     target = Path(media_root) / relative
     target.mkdir(parents=True, exist_ok=True)
 

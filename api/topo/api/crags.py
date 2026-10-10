@@ -9,7 +9,7 @@ from topo.api.common import area_path, media_url
 from topo.api.deps import current_editor, start_change
 from topo.api.errors import ApiError, not_found, raise_not_found
 from topo.db import get_session, refresh_area_geom
-from topo.depth import SEGMENTS_FILE, wants_3d
+from topo.depth import SEGMENTS_FILE, photo_folder, wants_3d
 from topo.editing import apply_fields, apply_grade, area_kind_ok, delete_crag, location_from, location_of
 from topo.grades import to_french
 from topo.models import Area, Crag, Route, RouteLine, Wall
@@ -36,7 +36,7 @@ def _wall_out(wall: Wall) -> WallOut:
         depth_status=wall.depth_status,
         depth_model=wall.depth_model,
         segments_url=(
-            media_url(f"walls/{wall.id}/{SEGMENTS_FILE}")
+            media_url((photo_folder(wall) / SEGMENTS_FILE).as_posix())
             if wall.depth_status == "ready" and wall.vegetation_ratio is not None
             else None
         ),

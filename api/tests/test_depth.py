@@ -15,6 +15,7 @@ from topo.depth import (
     compute_depth,
     depth_size,
     load_depth,
+    photo_folder,
     normalize_depth,
     process_wall,
     run_depth,
@@ -259,3 +260,27 @@ def test_select_with_segments_picks_ready_walls_without_segmentation(session, tm
     session.flush()
     assert select_walls(session) == []
     assert select_walls(session, with_segments=True) == walls[1:]
+
+
+def test_process_wall_writes_next_to_numbered_photo(session, tmp_path):
+    crag = f.crag(session, f.area(session, "Dolina"), "Skała")
+    wall = f.wall(session, crag)
+    (tmp_path / "walls" / str(wall.id) / "2").mkdir(parents=True)
+    relative = f"walls/{wall.id}/2/display.webp"
+    Image.new("RGB", (64, 48), (90, 90, 90)).save(tmp_path / relative, "WEBP")
+    wall.image_path = relative
+    session.commit()
+
+    process_wall(session, wall, tmp_path, FakeEstimator(), FakeSegmenter())
+
+    assert wall.depth_path == f"walls/{wall.id}/2/depth.png"
+    assert (tmp_path / "walls" / str(wall.id) / "2" / "segments.png").exists()
+    assert not (tmp_path / "walls" / str(wall.id) / "depth.png").exists()
+
+
+def test_photo_folder(session):
+    crag = f.crag(session, f.area(session, "Dolina"), "Skała")
+    wall = f.wall(session, crag)
+    assert photo_folder(wall).as_posix() == f"walls/{wall.id}"
+    wall.image_path = f"walls/{wall.id}/3/display.webp"
+    assert photo_folder(wall).as_posix() == f"walls/{wall.id}/3"

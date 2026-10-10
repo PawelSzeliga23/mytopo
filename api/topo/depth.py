@@ -4,7 +4,7 @@ import math
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Protocol
 
 import numpy as np
@@ -167,6 +167,13 @@ def select_walls(
     return list(session.scalars(stmt))
 
 
+def photo_folder(wall: Wall) -> PurePosixPath:
+    """Folder of the wall's current photo: its depth map and segmentation are stored next to it."""
+    if wall.image_path:
+        return PurePosixPath(wall.image_path).parent
+    return PurePosixPath("walls") / str(wall.id)
+
+
 def update_wall_fields(session: Session, wall_id: int, **values) -> None:
     # Core UPDATE on purpose: depth, segmentation and the 2.5D switch are derived data or display settings,
     # not edits. A Continuum version without an "import:" author would make the importer treat the wall as
@@ -191,7 +198,7 @@ def process_wall(
     """Computes the missing depth map (and segmentation, when a segmenter is given); ``force`` recomputes both."""
     need_depth = force or wall.depth_status != "ready"
     need_segments = segmenter is not None and (force or wall.vegetation_ratio is None)
-    folder = Path("walls") / str(wall.id)
+    folder = Path(photo_folder(wall))
     (Path(media_root) / folder).mkdir(parents=True, exist_ok=True)
     try:
         with Image.open(Path(media_root) / wall.image_path) as opened:

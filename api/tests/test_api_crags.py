@@ -98,7 +98,7 @@ def test_clean_wall_shows_3d_with_segments(client, session):
 
     [wall_out] = client.get(f"/api/crags/{crag.slug}").json()["walls"]
     assert wall_out["show_3d"] is True
-    assert wall_out["segments_url"] == f"/media/walls/{wall.id}/segments.png"
+    assert wall_out["segments_url"] == "/media/walls/9/segments.png"  # next to the photo
     assert wall_out["vegetation_ratio"] == 0.04
 
 
@@ -118,3 +118,12 @@ def test_wall_without_depth_has_no_segments_and_no_3d(client, session):
 
     [wall_out] = client.get(f"/api/crags/{crag.slug}").json()["walls"]
     assert wall_out["segments_url"] is None and wall_out["show_3d"] is False
+
+
+def test_segments_url_next_to_photo(client, session):
+    crag = f.crag(session, f.area(session, "Dolina"), "Skała")
+    f.wall(session, crag, image_path="walls/1/2/display.webp", depth_status="ready",
+           depth_path="walls/1/2/depth.png", vegetation_ratio=0.0)
+    session.commit()
+    [out] = client.get(f"/api/crags/{crag.slug}").json()["walls"]
+    assert out["segments_url"].endswith("walls/1/2/segments.png")
