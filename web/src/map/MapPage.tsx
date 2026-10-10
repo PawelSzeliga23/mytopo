@@ -245,7 +245,10 @@ export default function MapPage() {
           setCursor(event.features?.some((feature) => isClickableAt(feature.layer.id, event.target.getZoom())) ? "pointer" : "")
         }
         onMouseLeave={() => setCursor("")}
-        onMoveEnd={(event) => navigate({ hash: formatViewHash(event.viewState) }, { replace: true })}
+        onMoveEnd={(event) => {
+          // A move can end after a search pick already left the map: the view must not replace that page's address.
+          if (window.location.pathname === "/") navigate({ hash: formatViewHash(event.viewState) }, { replace: true });
+        }}
         cursor={mode.kind === "move" || mode.kind === "add" ? "crosshair" : cursor}
         style={{ position: "absolute", inset: 0 }}
         attributionControl={false}
