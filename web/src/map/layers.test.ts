@@ -88,6 +88,11 @@ describe("isClickableAt", () => {
     expect(isClickableAt("sector-fill", ZOOM.sectorsUntil - 0.3)).toBe(true);
     expect(isClickableAt("sector-fill", ZOOM.sectorsUntil - 0.2)).toBe(false);
   });
+  it("obwódka sektora: klikalna przy każdym bliższym przybliżeniu", () => {
+    expect(isClickableAt("sector-outline-hit", ZOOM.sectorsFrom + 0.2)).toBe(false);
+    expect(isClickableAt("sector-outline-hit", ZOOM.sectorsUntil)).toBe(true);
+    expect(isClickableAt("sector-outline-hit", 20)).toBe(true);
+  });
   it("crags-loose i crags-sector: dopiero po połowie pojawiania się", () => {
     expect(isClickableAt("crags-loose", ZOOM.looseCragsFrom + 0.2)).toBe(false);
     expect(isClickableAt("crags-loose", ZOOM.looseCragsFrom + 0.3)).toBe(true);

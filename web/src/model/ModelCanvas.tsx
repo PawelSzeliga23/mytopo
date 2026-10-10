@@ -27,6 +27,8 @@ export interface ModelCanvasProps {
   showRoutes: boolean;
   rockColor: string | null;
   groundColor: string | null;
+  /** 0–1: how strongly the photo look shows the hologram colours. */
+  tint: number;
   onStroke(patch: Patch): void;
 }
 
@@ -66,7 +68,7 @@ function fullIndex(gx: number, gy: number): Uint32Array {
 }
 
 function ModelScene(props: ModelCanvasProps) {
-  const { grid, revision, wall, routes, tool, brush, look, relief, showRoutes, rockColor, groundColor, onStroke } = props;
+  const { grid, revision, wall, routes, tool, brush, look, relief, showRoutes, rockColor, groundColor, tint, onStroke } = props;
   const { theme } = useTheme();
   const surface = useMemo(() => surfaceOf(grid), [grid]);
   const { geometry, pick } = useMemo(() => {
@@ -121,7 +123,11 @@ function ModelScene(props: ModelCanvasProps) {
 
   const photo = usePhoto(wall.image_url, look === "photo");
   const hologram = useMemo(() => createHologramMaterial(rockColor, groundColor), [rockColor, groundColor]);
-  const photoMaterial = useMemo(() => (photo ? createPhotoMaterial(photo) : null), [photo]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- tint changes live through the uniform below
+  const photoMaterial = useMemo(() => (photo ? createPhotoMaterial(photo, rockColor, groundColor, tint) : null), [photo, rockColor, groundColor]);
+  useEffect(() => {
+    if (photoMaterial) photoMaterial.uniforms.tint.value = tint;
+  }, [photoMaterial, tint]);
   useEffect(() => () => hologram.dispose(), [hologram]);
   useEffect(() => () => photoMaterial?.dispose(), [photoMaterial]);
   const hidden = useMemo(() => new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, side: THREE.DoubleSide }), []);

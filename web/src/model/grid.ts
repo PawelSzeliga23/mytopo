@@ -28,7 +28,10 @@ export interface Patch {
   afterCls: Float32Array;
 }
 
-export type Brush = "flatten" | "erase" | "restore" | "rock" | "ground";
+export type Brush = "flatten" | "smooth" | "erase" | "restore" | "rock" | "ground";
+
+/** How far (in grid cells) the smoothing brush averages around each node; a drag over a spot smooths it further. */
+const SMOOTH_REACH = 2;
 
 function sample(raster: Raster, classes: Uint8Array | null, gx: number, gy: number) {
   const nx = gx + 1;
@@ -124,6 +127,19 @@ export class Stroke {
       if (ring.length === 0) return;
       const level = median(ring.map((k) => grid.depth[k]));
       for (const k of nodes) this.recorder.set(k, level, grid.cls[k]);
+    } else if (brush === "smooth") {
+      // Each brushed rock or ground node takes the mean depth of the rock and ground around it: steps left by
+      // "flatten" fade out. Means come from the depths before this dab, so the order of nodes does not matter.
+      const nx = grid.gx + 1;
+      const means = nodes.map((k) => {
+        if (!isSolid(grid.cls[k])) return null;
+        const around = brushNodes(grid, k % nx, Math.floor(k / nx), SMOOTH_REACH).filter((n) => isSolid(grid.cls[n]));
+        return around.reduce((sum, n) => sum + grid.depth[n], 0) / around.length;
+      });
+      nodes.forEach((k, index) => {
+        const mean = means[index];
+        if (mean !== null) this.recorder.set(k, mean, grid.cls[k]);
+      });
     } else if (brush === "restore") {
       for (const k of nodes) this.recorder.set(k, grid.origDepth[k], grid.origCls[k]);
     } else {

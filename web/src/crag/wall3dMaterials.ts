@@ -56,16 +56,32 @@ export function createHologramMaterial(rockColor: string | null = null, groundCo
   });
 }
 
-export function createPhotoMaterial(photo: THREE.Texture): THREE.ShaderMaterial {
+/**
+ * The photo on the model; `tint` (0–1, the uniform can change live) lays the hologram colours over it, keeping the
+ * photo's light and shade — shows what the model takes for rock and for ground (as the plan 5a preview did).
+ */
+export function createPhotoMaterial(photo: THREE.Texture, rockColor: string | null = null, groundColor: string | null = null, tint = 0): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     side: THREE.DoubleSide,
-    uniforms: { map: { value: photo } },
+    uniforms: {
+      map: { value: photo },
+      tint: { value: tint },
+      rock: { value: new THREE.Color(rockColor ?? ROCK_COLOR) },
+      ground: { value: new THREE.Color(groundColor ?? GROUND_COLOR) },
+    },
     vertexShader,
     fragmentShader: /* glsl */ `
       uniform sampler2D map;
+      uniform float tint;
+      uniform vec3 rock;
+      uniform vec3 ground;
       varying vec2 vUv;
+      varying float vGround;
       void main() {
-        gl_FragColor = vec4(texture2D(map, vUv).rgb, 1.0);
+        vec3 texel = texture2D(map, vUv).rgb;
+        float luminance = dot(texel, vec3(0.299, 0.587, 0.114));
+        vec3 tinted = luminance * mix(rock, ground, vGround) * 2.0;
+        gl_FragColor = vec4(mix(texel, tinted, tint), 1.0);
         #include <colorspace_fragment>
       }`,
   });

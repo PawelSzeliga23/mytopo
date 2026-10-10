@@ -20,6 +20,7 @@ const MAX_STEPS = 100;
 const TOOLS: { tool: ModelTool; label: string }[] = [
   { tool: "orbit", label: "Obracanie" },
   { tool: "flatten", label: "Spłaszcz" },
+  { tool: "smooth", label: "Wygładzaj" },
   { tool: "erase", label: "Gumka" },
   { tool: "restore", label: "Przywróć" },
   { tool: "rock", label: "Maluj skałę" },
@@ -122,6 +123,7 @@ function ModelEditor({ crag, wall, grid }: { crag: CragDetail; wall: WallOut; gr
   const [brush, setBrush] = useState(8);
   const [look, setLook] = useState<Look>("holo");
   const [relief, setRelief] = useState(0.25);
+  const [tint, setTint] = useState(0.5);
   const [showRoutes, setShowRoutes] = useState(true);
   const initial: Settings = { rockColor: wall.rock_color, groundColor: wall.ground_color, switch3d: SWITCH_OF(wall.depth_enabled) };
   const [settings, setSettings] = useState<Settings>(initial);
@@ -241,7 +243,7 @@ function ModelEditor({ crag, wall, grid }: { crag: CragDetail; wall: WallOut; gr
         </label>
         <div className="grid grid-cols-2 gap-1.5">
           <Button variant="outline" size="sm" onClick={() => push(smooth(grid))}>
-            Wygładź
+            Wygładź całość
           </Button>
           <Button variant="outline" size="sm" onClick={() => push(trimEdge(grid))}>
             Przytnij krawędź
@@ -257,6 +259,12 @@ function ModelEditor({ crag, wall, grid }: { crag: CragDetail; wall: WallOut; gr
             zdjęcie
           </Choice>
         </div>
+        {look === "photo" && (
+          <label className="flex items-center gap-2">
+            kolory na zdjęciu
+            <input aria-label="Kolory hologramu na zdjęciu" type="range" min={0} max={1} step={0.05} value={tint} onChange={(event) => setTint(Number(event.target.value))} className="flex-1" />
+          </label>
+        )}
         <label className="flex items-center gap-2">
           głębia
           <input aria-label="Głębia podglądu" type="range" min={0} max={0.6} step={0.01} value={relief} onChange={(event) => setRelief(Number(event.target.value))} className="flex-1" />
@@ -314,10 +322,11 @@ function ModelEditor({ crag, wall, grid }: { crag: CragDetail; wall: WallOut; gr
             showRoutes={showRoutes}
             rockColor={settings.rockColor}
             groundColor={settings.groundColor}
+            tint={tint}
             onStroke={push}
           />
           <span className="pointer-events-none absolute left-2 top-2 rounded-md bg-foreground/85 px-2 py-1 text-xs text-background">
-            {tool === "orbit" ? "Przeciągnij, żeby obrócić · kółko / dwa palce przybliżają" : "Przeciągnij po modelu"}
+            {tool === "orbit" ? "Przeciągnij, żeby obrócić · kółko / dwa palce przybliżają" : "Przeciągnij po modelu · kółko / dwa palce przybliżają"}
           </span>
         </div>
         <aside className={cn("overflow-y-auto border-border p-3", desktop ? "w-72 border-l" : "max-h-[42dvh] border-t bg-secondary")}>{panel}</aside>

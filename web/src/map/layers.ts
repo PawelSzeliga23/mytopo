@@ -25,7 +25,7 @@ export const MAP_COLORS: Record<Theme, MapColors> = {
 /** Crags still waiting to be placed on the map (e.g. after "Zamień w sektor"). */
 export const NEEDS_LOCATION_COLOR = "#E0A100";
 
-export const INTERACTIVE_LAYERS = ["region-points", "sector-fill", "crags-isolated", "crags-loose", "crags-sector"];
+export const INTERACTIVE_LAYERS = ["region-points", "sector-fill", "sector-outline-hit", "crags-isolated", "crags-loose", "crags-sector"];
 
 const FONT = ["Noto Sans Bold"];
 const e = (expression: unknown) => expression as ExpressionSpecification;
@@ -86,6 +86,13 @@ export function sectorLayers(c: MapColors): LayerProps[] {
       type: "line",
       minzoom: from,
       paint: { "line-color": c.brand, "line-width": 1.2, "line-opacity": fadeIn(from) },
+    },
+    // An invisible wide band along the outline: the thin line is easy to hit and opens the sector at any zoom.
+    {
+      id: "sector-outline-hit",
+      type: "line",
+      minzoom: from,
+      paint: { "line-color": c.brand, "line-width": 14, "line-opacity": 0 },
     },
     {
       id: "sector-labels",
@@ -169,11 +176,12 @@ export function moveLineLayer(c: MapColors): LayerProps {
   return { id: "edit-move-line", type: "line", paint: { "line-color": c.brand, "line-width": 2, "line-dasharray": [2, 2] } };
 }
 
-const FADE_HALF =0.25;
+const FADE_HALF = 0.25;
 // [fade-in start, fade-out end] per interactive layer; null = no fade on that side.
 const CLICKABLE_RANGE: Record<string, [number | null, number | null]> = {
   "region-points": [null, ZOOM.regionsUntil],
   "sector-fill": [ZOOM.sectorsFrom, ZOOM.sectorsUntil],
+  "sector-outline-hit": [ZOOM.sectorsFrom, null],
   "crags-isolated": [null, null],
   "crags-loose": [ZOOM.looseCragsFrom, null],
   "crags-sector": [ZOOM.sectorCragsFrom, null],

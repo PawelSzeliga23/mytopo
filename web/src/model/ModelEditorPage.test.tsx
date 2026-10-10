@@ -99,7 +99,7 @@ describe("ModelEditorPage", () => {
     renderPage();
     await userEvent.click(await screen.findByRole("button", { name: "pociągnij gumką" }));
     expect(screen.getByRole("button", { name: "Zapisz (1 zmiana)" })).toBeEnabled();
-    await userEvent.click(screen.getByRole("button", { name: "Wygładź" })); // flat model: nothing to smooth, no step
+    await userEvent.click(screen.getByRole("button", { name: "Wygładź całość" })); // flat model: nothing to smooth, no step
     await userEvent.click(screen.getByRole("button", { name: "Przytnij krawędź" }));
     expect(screen.getByRole("button", { name: "Zapisz (2 zmiany)" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Cofnij" }));

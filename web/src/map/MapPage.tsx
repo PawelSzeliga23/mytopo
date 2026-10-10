@@ -192,7 +192,7 @@ export default function MapPage() {
     }
     const id = Number(feature.properties?.id);
     const layer = feature.layer.id;
-    if (layer === "region-points" || layer === "sector-fill") {
+    if (layer === "region-points" || layer === "sector-fill" || layer === "sector-outline-hit") {
       const area = (layer === "region-points" ? index.regions : index.sectors).get(id);
       if (area) selectArea(area);
       return;

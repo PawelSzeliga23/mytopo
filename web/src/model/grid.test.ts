@@ -85,6 +85,20 @@ describe("grid", () => {
     expect(g.depth[node(g, 110, 100)]).not.toBe(level);
   });
 
+  it("the smoothing brush evens out a step only under the brush", () => {
+    const g = grid();
+    const nx = g.gx + 1;
+    for (let k = 0; k < g.depth.length; k++) g.depth[k] = k % nx < 100 ? 0.2 : 0.6;
+    const stroke = new Stroke(g);
+    stroke.apply("smooth", 100, 50, 3);
+    const patch = stroke.finish()!;
+    expect(g.depth[node(g, 99, 50)]).toBeGreaterThan(0.21);
+    expect(g.depth[node(g, 100, 50)]).toBeLessThan(0.59);
+    expect(g.depth[node(g, 99, 60)]).toBe(Math.fround(0.2)); // outside the brush
+    applyPatch(g, patch, "undo");
+    expect(g.depth[node(g, 99, 50)]).toBe(Math.fround(0.2));
+  });
+
   it("smooth removes a single spike", () => {
     const g = grid();
     const k = node(g, 50, 50);
