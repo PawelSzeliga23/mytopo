@@ -134,3 +134,14 @@ export function encodeModel(grid): { depth: Blob; segments: Blob }
 - [ ] Cały backend i front; `docker compose up -d api` (migracja); próba przez API na bazie dev (zapis modelu z rastrem z oryginału, historia, cofnięcie) i sprzątnięcie.
 - [ ] Przegląd gałęzi, poprawki znalezisk z testem (RED→GREEN).
 - [ ] „Wnioski z wykonania” w tym planie; pytanie o scalenie.
+
+---
+
+## Wnioski z wykonania
+
+- Wykonanie inline, bez etapu prototypu (prototyp z galerii `depth-preview` przeniesiony do aplikacji); przegląd gałęzi samodzielny.
+- „Wygładź” i „Przytnij krawędź” to przyciski (jeden krok cofania każdy), nie suwaki jak w prototypie — pasują do stosu kroków i do „wypiekania”.
+- Powrót do domyślnego koloru wysyłany jako `default` (FastAPI traktuje pusty string w formularzu jak brak pola).
+- `usePhoto` przeniesione do `wall3dMaterials.ts` (eksport z `Wall3D.tsx` dawał ostrzeżenie fast refresh).
+- Sprawdzone w przeglądarce (Playwright, baza dev): edytor się wyświetla, gumka wycina dziurę, „Przywróć” ją częściowo łata, Ctrl+Z cofa, zapis tworzy `model-1-*.png`, strona skały w 2.5D pokazuje poprawiony model; zapis cofnięty, pliki testowe usunięte.
+- Odłożone drobiazgi: podmiana zdjęcia w trakcie edycji modelu (gdy nowa głębia zdąży się policzyć i ma ten sam rozmiar) nie daje konfliktu — zapis nałoży stary model na nowe zdjęcie (do cofnięcia w historii); przy rastrze głębi węższym niż siatka (zdjęcia < 385 px) część węzłów nie przetrwa wypiekania; telefon w trybie pędzla nie przybliża (trzeba przełączyć na „Obracanie”); roślinność (`vegetation_ratio`) nie jest przeliczana z poprawionej segmentacji.
