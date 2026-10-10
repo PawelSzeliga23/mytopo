@@ -10,6 +10,7 @@ import MapPage from "@/map/MapPage";
 const CragPage = lazy(() => import("@/pages/CragPage"));
 const ChangesPage = lazy(() => import("@/pages/ChangesPage"));
 const EditorPage = lazy(() => import("@/editor/EditorPage"));
+const ModelEditorPage = lazy(() => import("@/model/ModelEditorPage"));
 
 const router = createBrowserRouter([
   { path: "/", element: <MapPage /> },
@@ -26,6 +27,14 @@ const router = createBrowserRouter([
     element: (
       <Suspense fallback={<p className="p-4 text-muted-foreground">Wczytywanie…</p>}>
         <EditorPage />
+      </Suspense>
+    ),
+  },
+  {
+    path: "/skaly/:slug/model/:wallId",
+    element: (
+      <Suspense fallback={<p className="p-4 text-muted-foreground">Wczytywanie…</p>}>
+        <ModelEditorPage />
       </Suspense>
     ),
   },

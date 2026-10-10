@@ -13,7 +13,7 @@ import {
   type Surface,
 } from "@/crag/surface";
 import { IDENTITY } from "@/crag/view";
-import { createHologramMaterial, createPhotoMaterial } from "@/crag/wall3dMaterials";
+import { createHologramMaterial, createPhotoMaterial, usePhoto } from "@/crag/wall3dMaterials";
 import type { RouteOut, WallOut } from "@/lib/api";
 import { useTheme } from "@/lib/theme";
 
@@ -69,21 +69,6 @@ function useSurface(wall: WallOut, onFail: () => void): Surface | null {
     };
   }, [wall.depth_url, wall.segments_url]);
   return surface;
-}
-
-function usePhoto(url: string | null, enabled: boolean): THREE.Texture | null {
-  const [texture, setTexture] = useState<THREE.Texture | null>(null);
-  useEffect(() => {
-    if (!enabled || !url) return;
-    let current: THREE.Texture | null = null;
-    new THREE.TextureLoader().load(url, (loaded) => {
-      loaded.colorSpace = THREE.SRGBColorSpace;
-      current = loaded;
-      setTexture(loaded);
-    });
-    return () => current?.dispose();
-  }, [url, enabled]);
-  return texture;
 }
 
 function SurfaceMesh({ surface, relief, material }: { surface: Surface; relief: number; material: THREE.Material }) {

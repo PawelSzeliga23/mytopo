@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import * as THREE from "three";
 
 /** Hologram colours: soft light-blue rock, neutral grey ground (as agreed after the plan 5a trial). */
@@ -68,4 +69,20 @@ export function createPhotoMaterial(photo: THREE.Texture): THREE.ShaderMaterial 
         #include <colorspace_fragment>
       }`,
   });
+}
+
+/** The wall photo as a texture, loaded only when the photo look is on. */
+export function usePhoto(url: string | null, enabled: boolean): THREE.Texture | null {
+  const [texture, setTexture] = useState<THREE.Texture | null>(null);
+  useEffect(() => {
+    if (!enabled || !url) return;
+    let current: THREE.Texture | null = null;
+    new THREE.TextureLoader().load(url, (loaded) => {
+      loaded.colorSpace = THREE.SRGBColorSpace;
+      current = loaded;
+      setTexture(loaded);
+    });
+    return () => current?.dispose();
+  }, [url, enabled]);
+  return texture;
 }
