@@ -197,7 +197,7 @@ na serwerze:
 - Raport końcowy: liczby obszarów, regionów, sektorów, skał, ścian, dróg i punktów; błędy; linie z podejrzaną skalą; nieznane wyceny; niedopasowane wpisy z wspinanie.pl.
 - Segmentacja: SegFormer-B5 (ADE20K) w tym samym kroku `topo depth`, zapis `walls/{id}/segments.png` i `wall.vegetation_ratio`.
 - Głębia: Depth Anything V2 — lokalnie na GPU domyślnie Large (licencja CC-BY-NC, projekt jest niekomercyjny), na serwerze Small na CPU (Apache 2.0) dla nowo wgranych zdjęć. Model zapisywany w `wall.depth_model`, co pozwala później przeliczyć lokalnie ściany zrobione modelem Small.
-- Kolejka na serwerze: tabela `depth_job` i wątek w API pobierający zadania (`SELECT … FOR UPDATE SKIP LOCKED`). Bez Redisa i Celery.
+- Kolejka na serwerze: tabela `depth_job` i osobny proces `topo depth-worker` (usługa `depth-worker`, obraz z torch) pobierający zadania (`SELECT … FOR UPDATE SKIP LOCKED`); obraz API zostaje bez torch (plan 7b). Bez Redisa i Celery.
 
 ## 9. Obsługa błędów
 

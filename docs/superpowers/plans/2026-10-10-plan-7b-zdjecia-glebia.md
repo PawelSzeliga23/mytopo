@@ -1075,3 +1075,15 @@ git commit -m "feat: wgrywanie zdjęć ścian i status 2.5D na stronie skały"
 - [ ] **Step 2:** Przebudowa obrazów (`docker compose build api`, `docker compose --profile depth build`), restart API; ręcznie przez API: wgranie zdjęcia na testową skałę w dev DB, sprawdzenie plików i `depth_job`; uruchomienie workera na chwilę, jeśli obraz `depth` jest gotowy (inaczej zostawić użytkownikowi).
 - [ ] **Step 3:** Przegląd całej gałęzi (`git diff master...`): zgodność ze spec, błędy, brakujące testy; poprawki osobnym commitem.
 - [ ] **Step 4:** „Wnioski z wykonania” na końcu tego planu; aktualizacja specu głównej (§8 worker) jednym zdaniem; zgłoszenie użytkownikowi gotowości do scalenia (bez scalania).
+
+---
+
+## Wnioski z wykonania
+
+- Wykonanie inline (jedna sesja), testy pisane z kodem i uruchamiane raz na koniec zadania; przegląd gałęzi zrobiony samodzielnie (bez osobnego recenzenta).
+- Nowa ściana dostaje id z sekwencji przed zapisem zdjęcia i jest wstawiana jednym INSERT — inaczej Continuum zapisywał ją jako „zmienioną”, a nie „dodaną”, i cofnięcie dodania kończyło się konfliktem.
+- Cofnięcie (podmiany albo usunięcia ściany) dodaje zadanie głębi, gdy w katalogu zdjęcia brakuje `depth.png` albo `segments.png`.
+- Po przeglądzie: API przyjmuje tylko JPEG, PNG i WebP (wcześniej każdy format Pillow), zdjęcia MPO z telefonów są JPEG-ami z rozszerzeniem `.jpg`; worker nie wywraca się, gdy ściana zniknie w trakcie liczenia.
+- Sprawdzone na bazie dev: wgranie → `walls/{id}/1/`, worker na starym obrazie `topo-depth` (Large, GPU) liczy ścianę w ~2 s, podmiana i jej cofnięcie przywracają zdjęcie z gotową głębią, SIGTERM zatrzymuje workera w ~3 s.
+- Do zrobienia przy okazji: obraz `depth` trzeba przebudować (`docker compose --profile depth build depth`), bo zmienił się `uv.lock` (worker działa i na starym, multipart potrzebne jest tylko w API); produkcyjny nginx potrzebuje `client_max_body_size 30m`.
+- Odłożone drobiazgi: błąd segmentacji po udanej głębi zostawia status `ready` bez „Ponów”; po wyjściu z edytora nowej ściany strona skały pokazuje pierwszą ścianę; zadanie dla cofniętego zdjęcia czeka do uruchomienia workera (kończy się bez liczenia); `depth_model` po przywróceniu z dysku jest pusty.
