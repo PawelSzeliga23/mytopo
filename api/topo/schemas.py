@@ -107,6 +107,9 @@ class CragSummary(BaseModel):
     grade_min_sort: int | None
     grade_max: str | None
     grade_max_sort: int | None
+    sector_name: str | None = None
+    lng: float | None = None
+    lat: float | None = None
 
 
 class AreaChild(BaseModel):
@@ -116,6 +119,7 @@ class AreaChild(BaseModel):
     kind: str
     crag_count: int
     route_count: int
+    grade_bands: list[int]
 
 
 class AreaOut(BaseModel):

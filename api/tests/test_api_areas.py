@@ -25,10 +25,11 @@ def test_area_detail(client, session):
     children = {c["name"]: c for c in body["children"]}
     assert (children["Grupa Żabiego Konia"]["crag_count"], children["Grupa Żabiego Konia"]["route_count"]) == (1, 1)
     assert (children["Pusty"]["crag_count"], children["Pusty"]["route_count"]) == (0, 0)
-    [crag] = body["crags"]
-    assert crag["name"] == "Samotna"
-    assert crag["route_count"] == 2
-    assert crag["grade_bands"] == [1, 0, 0, 1]
+    [lone, zabi] = body["crags"]
+    assert (lone["name"], lone["sector_name"], lone["route_count"], lone["grade_bands"]) == ("Samotna", None, 2, [1, 0, 0, 1])
+    assert (zabi["name"], zabi["sector_name"]) == ("Żabi Koń", "Grupa Żabiego Konia")
+    assert (round(zabi["lng"], 3), round(zabi["lat"], 3)) == (19.756, 50.156)
+    assert children["Grupa Żabiego Konia"]["grade_bands"] == [0, 0, 1, 0]
     assert len(body["center"]) == 2
     assert len(body["bbox"]) == 4
 
@@ -47,3 +48,11 @@ def test_area_not_found(client):
     response = client.get("/api/areas/nie-ma")
     assert response.status_code == 404
     assert response.json()["message"] == "Nie znaleziono: obszar"
+
+
+def test_top_area_lists_regions_only(client, session):
+    seed(session)
+    body = client.get("/api/areas/jura-krakowsko-czestochowska").json()
+    assert body["crags"] == []
+    [region] = body["children"]
+    assert (region["name"], region["crag_count"], region["grade_bands"]) == ("Dolina Kobylańska", 2, [1, 0, 1, 1])

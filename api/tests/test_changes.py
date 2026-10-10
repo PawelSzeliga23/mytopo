@@ -88,8 +88,9 @@ def test_location_is_lon_lat(session):
     assert (diff.field, diff.before, diff.after) == ("location", [19.75, 50.15], [19.8, 50.2])
 
 
-def test_changes_require_login(client):
-    assert client.get("/api/changes").status_code == 401
+def test_changes_are_public_but_revert_needs_login(client):
+    assert client.get("/api/changes").status_code == 200
+    assert client.post("/api/changes/1/revert", json={}).status_code == 401
 
 
 def test_api_returns_objects_and_crag(editor, session):
@@ -229,3 +230,15 @@ def test_first_versioned_update_of_preexisting_row_stays_updated(editor, session
     assert change.after["description"] == "Opis"
     [item] = changes_for(editor)["items"][:1]
     assert item["objects"][0]["op"] == "updated"
+
+
+def test_area_fields_show_names(editor, session):
+    jura = f.area(session, "Jura", kind="obszar")
+    first = f.area(session, "Dolina Kobylańska", parent=jura)
+    second = f.area(session, "Dolina Będkowska", parent=jura)
+    crag = f.crag(session, first, "Żabi Koń")
+    session.commit()
+    assert editor.patch(f"/api/crags/{crag.id}", json={"area_id": second.id}).status_code == 200
+    [item, *_] = editor.get("/api/changes", params={"crag": crag.id}).json()["items"]
+    [diff] = [d for o in item["objects"] for d in o["diffs"] if d["field"] == "area_id"]
+    assert (diff["before"], diff["after"]) == ("Dolina Kobylańska", "Dolina Będkowska")

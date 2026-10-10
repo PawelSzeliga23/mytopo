@@ -27,7 +27,6 @@ def get_changes(
     include_import: bool = False,
     limit: Annotated[int, Query(ge=1, le=100)] = 30,
     before: int | None = None,
-    _nick: str = Depends(current_editor),
     session: Session = Depends(get_session),
 ) -> ChangesPage:
     items = list_changes(session, crag_id=crag, kind=kind, include_import=include_import, limit=limit + 1, before=before)

@@ -21,6 +21,8 @@ SKIP_FIELDS = frozenset({
     "route_vegetation_ratio", "needs_location",
 })
 
+AREA_FIELDS = frozenset({"area_id", "parent_id"})  # shown in the change list as area names
+
 Op = Literal["created", "updated", "deleted"]
 _OPS: dict[int, Op] = {0: "created", 1: "updated", 2: "deleted"}
 
@@ -121,6 +123,13 @@ def _object_changes(session: Session, tx_id: int, changes: list[ObjectChange]) -
             cache[model, obj_id] = _latest_version(session, model, obj_id, tx_id, inclusive=True)
         return cache[model, obj_id]
 
+    def shown(field: str, value: Any) -> Any:
+        """Area references read as names (of the area at that time, also when it is gone since)."""
+        if field in AREA_FIELDS and isinstance(value, int):
+            area = latest(Area, value)
+            return area.name if area is not None else value
+        return value
+
     crag_id: int | None = None
     for change in changes:
         values = change.after if change.after is not None else change.before
@@ -148,7 +157,8 @@ def _object_changes(session: Session, tx_id: int, changes: list[ObjectChange]) -
         objects.append(
             ObjectChangeOut(
                 kind=KIND[change.model], id=change.id, name=values.get("name"), op=change.op,
-                diffs=[FieldDiffOut(field=d.field, before=d.before, after=d.after) for d in change.diffs], summary=None,
+                diffs=[FieldDiffOut(field=d.field, before=shown(d.field, d.before), after=shown(d.field, d.after)) for d in change.diffs],
+                summary=None,
             )
         )
     for wall_id, counts in topo.items():

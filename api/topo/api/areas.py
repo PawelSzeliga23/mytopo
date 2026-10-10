@@ -10,7 +10,7 @@ from topo.api.errors import ApiError, not_found, raise_not_found
 from topo.db import get_session, refresh_area_geom
 from topo.editing import apply_fields
 from topo.models import Area, Crag
-from topo.queries import crag_summaries
+from topo.queries import area_grade_bands, crag_summaries
 from topo.schemas import AreaChild, AreaOut, CragSummary
 from topo.schemas_edit import AreaCreate, AreaPatch, DeleteBody
 from topo.sectors import make_sector
@@ -49,6 +49,9 @@ def get_area(slug: str, session: Session = Depends(get_session)) -> AreaOut:
         raise not_found("obszar")
     stats = _area_stats(session, [area.id, *(child.id for child in area.children)])
     own = stats.get(area.id)
+    bands = area_grade_bands(session, [child.id for child in area.children])
+    # The top level (e.g. the Jura) lists its regions only: its crags are thousands.
+    crags = [] if area.kind == "obszar" else crag_summaries(session, area.id, with_sectors=True)
     return AreaOut(
         id=area.id,
         name=area.name,
@@ -64,10 +67,11 @@ def get_area(slug: str, session: Session = Depends(get_session)) -> AreaOut:
                 kind=child.kind,
                 crag_count=stats.get(child.id, {}).get("crag_count", 0),
                 route_count=stats.get(child.id, {}).get("route_count", 0),
+                grade_bands=bands.get(child.id, [0, 0, 0, 0]),
             )
             for child in area.children
         ],
-        crags=[CragSummary(**summary) for summary in crag_summaries(session, area.id)],
+        crags=[CragSummary(**summary) for summary in crags],
         center=own["center"] if own else None,
         bbox=own["bbox"] if own else None,
     )

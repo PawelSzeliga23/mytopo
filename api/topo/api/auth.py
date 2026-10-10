@@ -3,9 +3,8 @@ import hmac
 from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel
 
-from topo.api.deps import current_editor
 from topo.api.errors import ApiError
-from topo.auth import COOKIE, MAX_AGE, clean_nick, login_limiter, make_token
+from topo.auth import COOKIE, MAX_AGE, clean_nick, login_limiter, make_token, read_token
 from topo.config import get_settings
 
 router = APIRouter()
@@ -14,6 +13,10 @@ router = APIRouter()
 class LoginIn(BaseModel):
     password: str
     nick: str
+
+
+class MeOut(BaseModel):
+    nick: str | None  # None: not logged in (a 200, so the browser logs no failed request)
 
 
 class NickOut(BaseModel):
@@ -47,6 +50,6 @@ def logout(response: Response) -> None:
     response.delete_cookie(COOKIE, path="/")
 
 
-@router.get("/me", response_model=NickOut)
-def me(nick: str = Depends(current_editor)) -> NickOut:
-    return NickOut(nick=nick)
+@router.get("/me", response_model=MeOut)
+def me(request: Request) -> MeOut:
+    return MeOut(nick=read_token(request.cookies.get(COOKIE), get_settings()) or None)

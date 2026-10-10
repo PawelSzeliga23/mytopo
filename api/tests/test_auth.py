@@ -65,20 +65,18 @@ def test_password_change_logs_out(client, edit_settings, monkeypatch):
     login(client)
     monkeypatch.setenv("EDIT_PASSWORD", "inne")
     get_settings.cache_clear()
-    assert client.get("/api/auth/me").status_code == 401
+    assert client.get("/api/auth/me").json() == {"nick": None}
 
 
 def test_forged_cookie(client, edit_settings):
     client.cookies.set(COOKIE, "podrobione")
-    response = client.get("/api/auth/me")
-    assert response.status_code == 401
-    assert response.json()["code"] == "unauthorized"
+    assert client.get("/api/auth/me").json() == {"nick": None}
 
 
 def test_logout(client, edit_settings):
     login(client)
     assert client.post("/api/auth/logout").status_code == 204
-    assert client.get("/api/auth/me").status_code == 401
+    assert client.get("/api/auth/me").json() == {"nick": None}
 
 
 def test_editing_disabled_without_password(client, monkeypatch):
