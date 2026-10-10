@@ -1,14 +1,19 @@
+from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Form, Query, Response, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from topo.api.deps import current_editor, start_change
-from topo.api.errors import raise_not_found
+from topo.api.errors import ApiError, raise_not_found
+from topo.config import get_settings
 from topo.db import get_session
+from topo.depth import update_wall_fields
+from topo.depth_queue import enqueue_depth
 from topo.editing import apply_fields, delete_wall
 from topo.models import Wall
+from topo.photos import read_upload, set_photo
 from topo.schemas_edit import DeleteBody, WallLinesIn, WallPatch
 from topo.topo_edit import VersionConflict, save_wall_lines
 
@@ -64,3 +69,33 @@ def put_wall_lines(
         session.rollback()
         return {"version": wall.version, "ids": {}}
     return {"version": result.version, "ids": result.ids}
+
+
+@router.put("/{wall_id:int}/image")
+def replace_image(
+    wall_id: int,
+    file: UploadFile,
+    comment: Annotated[str | None, Form(max_length=500)] = None,
+    nick: str = Depends(current_editor),
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    data = read_upload(file)
+    # Locked until commit: two uploads at the same moment must not pick the same folder number.
+    wall = session.get(Wall, wall_id, with_for_update=True) or raise_not_found("ściana")
+    start_change(session, nick, comment)
+    set_photo(session, wall, data, Path(get_settings().media_root))
+    session.commit()
+    return {"id": wall.id, "version": wall.version}
+
+
+@router.post("/{wall_id:int}/depth", status_code=202)
+def retry_depth(
+    wall_id: int, _nick: str = Depends(current_editor), session: Session = Depends(get_session)
+) -> dict[str, bool]:
+    wall = session.get(Wall, wall_id) or raise_not_found("ściana")
+    if wall.image_path is None:
+        raise ApiError(422, "no_image", "Ściana nie ma zdjęcia")
+    update_wall_fields(session, wall.id, depth_status="pending")  # derived data: no history entry
+    enqueue_depth(session, wall.id)
+    session.commit()
+    return {"queued": True}

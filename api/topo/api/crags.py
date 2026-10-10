@@ -1,18 +1,22 @@
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query, Response
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, Form, Query, Response, UploadFile
 from geoalchemy2.shape import to_shape
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from topo.api.common import area_path, media_url
 from topo.api.deps import current_editor, start_change
 from topo.api.errors import ApiError, not_found, raise_not_found
+from topo.config import get_settings
 from topo.db import get_session, refresh_area_geom
 from topo.depth import SEGMENTS_FILE, photo_folder, wants_3d
 from topo.editing import apply_fields, apply_grade, area_kind_ok, delete_crag, location_from, location_of
 from topo.grades import to_french
 from topo.models import Area, Crag, Route, RouteLine, Wall
+from topo.photos import read_upload, set_photo
 from topo.schemas import CragOut, LineOut, RouteOut, WallOut
 from topo.schemas_edit import CragCreate, CragPatch, DeleteBody, RouteCreate
 from topo.sectors import ToSectorPreview, crag_to_sector, to_sector_preview
@@ -209,3 +213,26 @@ def convert_to_sector(
         "sector": {"id": sector.id, "slug": sector.slug, "kind": sector.kind},
         "crags": [{"id": c.id, "slug": c.slug, "name": c.name, "needs_location": c.needs_location} for c in new_crags],
     }
+
+
+@router.post("/{crag_id:int}/walls", status_code=201)
+def create_wall(
+    crag_id: int,
+    file: UploadFile,
+    name: Annotated[str | None, Form(max_length=200)] = None,
+    comment: Annotated[str | None, Form(max_length=500)] = None,
+    nick: str = Depends(current_editor),
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    crag = session.get(Crag, crag_id) or raise_not_found("skała")
+    data = read_upload(file)
+    start_change(session, nick, comment)
+    last = session.scalar(select(func.max(Wall.sort_order)).where(Wall.crag_id == crag.id))
+    wall = Wall(
+        crag_id=crag.id, name=(name or "").strip() or None, sort_order=0 if last is None else last + 1, source="manual"
+    )
+    session.add(wall)
+    session.flush()
+    set_photo(session, wall, data, Path(get_settings().media_root))
+    session.commit()
+    return {"id": wall.id, "version": wall.version}

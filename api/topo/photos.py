@@ -1,0 +1,34 @@
+"""Photos uploaded in the app: each one goes to a new numbered folder, so reverting a replacement gets the old one back."""
+
+from pathlib import Path
+
+from fastapi import UploadFile
+from sqlalchemy.orm import Session
+
+from topo.api.errors import ApiError
+from topo.depth_queue import enqueue_depth
+from topo.media import InvalidImage, next_photo_number, store_wall_image
+from topo.models import Wall
+
+MAX_UPLOAD = 30 * 1024 * 1024
+
+
+def read_upload(file: UploadFile) -> bytes:
+    data = file.file.read(MAX_UPLOAD + 1)
+    if len(data) > MAX_UPLOAD:
+        raise ApiError(413, "too_large", "Zdjęcie jest większe niż 30 MB")
+    return data
+
+
+def set_photo(session: Session, wall: Wall, data: bytes, media_root: Path) -> None:
+    """Stores the photo, points the wall at it, clears what was derived from the old one and queues its depth."""
+    try:
+        stored = store_wall_image(media_root, wall.id, data, next_photo_number(media_root, wall.id))
+    except InvalidImage as exc:
+        session.rollback()
+        raise ApiError(422, "invalid_image", str(exc)) from exc
+    wall.image_original_path, wall.image_path, wall.thumb_path = stored.original_path, stored.image_path, stored.thumb_path
+    wall.image_width, wall.image_height = stored.width, stored.height
+    wall.depth_status, wall.depth_path, wall.depth_model = "pending", None, None
+    wall.vegetation_ratio = wall.route_vegetation_ratio = wall.depth_enabled = None
+    enqueue_depth(session, wall.id)
