@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { Fragment, useEffect, useMemo, useState, type MouseEvent } from "react";
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router";
+import { BackAndMap } from "@/components/BackAndMap";
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
@@ -27,8 +28,6 @@ const DEPTH_POLL_MS = 15_000;
 
 export default function CragPage() {
   const { slug = "" } = useParams();
-  const navigate = useNavigate();
-  const location = useLocation();
   const isDesktop = useIsDesktop();
   const compact = useCompactOnScroll(!isDesktop);
   const { isEditor, reauthenticating } = useSession();
@@ -70,13 +69,8 @@ export default function CragPage() {
   // Named after the wall, or "Zdjęcie n"; a lone unnamed wall needs no caption.
   const wallCaption = wall && crag && (crag.walls.length > 1 || wall.name ? wallLabel(wall, crag.walls.indexOf(wall)) : null);
 
-  // Opened from a link (or in a new tab): the map at this crag. Came from the map: back, so it restores its view.
+  // "Mapa" (and the logo) open the map at this crag; going back is the "←" beside it.
   const mapHref = crag ? `/${formatViewHash({ longitude: crag.lng, latitude: crag.lat, zoom: CRAG_ZOOM })}` : "/";
-  function backToMap(event: MouseEvent) {
-    if (location.key === "default" || event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0) return;
-    event.preventDefault();
-    navigate(-1);
-  }
 
   function chooseRow(row: RouteRow) {
     if (row.wallId !== null && row.wallId !== wall?.id) setWallId(row.wallId);
@@ -95,7 +89,7 @@ export default function CragPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 pb-10 lg:px-6">
       <header className="flex items-center justify-between py-3">
-        <Link to={mapHref} onClick={backToMap} aria-label="Wróć do mapy">
+        <Link to={mapHref} aria-label="topo — mapa">
           <Logo />
         </Link>
         <div className="flex items-center gap-2">
@@ -111,9 +105,7 @@ export default function CragPage() {
           <div className="contents lg:sticky lg:top-4 lg:flex lg:flex-col lg:gap-3">
             <div>
               <nav className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                <Link to={mapHref} onClick={backToMap} className="uppercase hover:text-foreground">
-                  ← Mapa
-                </Link>
+                <BackAndMap mapHref={mapHref} />
                 {crag.path.map((area) => (
                   <Fragment key={area.id}>
                     {" · "}

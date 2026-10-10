@@ -3,6 +3,7 @@ import { Fragment, lazy, Suspense, useEffect, useMemo, useState, type ReactNode 
 import { Link, useNavigate, useParams } from "react-router";
 import { Chip } from "@/components/Chip";
 import { GradeBar } from "@/components/GradeBar";
+import { BackAndMap } from "@/components/BackAndMap";
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
@@ -49,7 +50,7 @@ export default function AreaPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 pb-10 lg:px-6">
       <header className="flex items-center justify-between py-3">
-        <Link to="/" aria-label="Mapa">
+        <Link to="/" aria-label="topo — mapa">
           <Logo />
         </Link>
         <div className="flex items-center gap-2">
@@ -64,9 +65,7 @@ export default function AreaPage() {
           <div className="flex flex-col gap-3 lg:sticky lg:top-4">
             <div>
               <nav className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                <Link to={mapLink(area)} className="hover:text-foreground">
-                  ← Mapa
-                </Link>
+                <BackAndMap mapHref={mapLink(area)} />
                 {area.path.map((parent) => (
                   <Fragment key={parent.id}>
                     {" · "}

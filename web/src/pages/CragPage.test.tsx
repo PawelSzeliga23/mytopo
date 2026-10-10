@@ -153,18 +153,24 @@ it("?droga= z wyszukiwarki otwiera zdjęcie z tą drogą i ją zaznacza", async 
     expect(screen.queryByTestId("viewer")).not.toBeInTheDocument();
   });
 
-  it("← Mapa wraca do mapy, z której przyszliśmy", async () => {
+  it("← cofa o jeden krok", async () => {
     const router = renderAt(crag, ["/#12.00/50.10000/19.70000", "/skaly/brzuchata-turniczka"]);
-    await userEvent.click(await screen.findByRole("link", { name: "← Mapa" }));
-    expect(await screen.findByText("Mapa")).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: "Wstecz" }));
+    expect(router.state.location.pathname).toBe("/");
     expect(router.state.location.hash).toBe("#12.00/50.10000/19.70000");
   });
 
-  it("← Mapa po wejściu z linku: mapa przy skale", async () => {
-    const router = renderAt(crag);
-    await userEvent.click(await screen.findByRole("link", { name: "← Mapa" }));
-    expect(await screen.findByText("Mapa")).toBeInTheDocument();
+  it("Mapa zawsze otwiera mapę przy skale", async () => {
+    const router = renderAt(crag, ["/#12.00/50.10000/19.70000", "/skaly/brzuchata-turniczka"]);
+    await userEvent.click(await screen.findByRole("link", { name: "Mapa" }));
+    expect(router.state.location.pathname).toBe("/");
     expect(router.state.location.hash).toBe("#15.00/50.16614/19.76472");
+  });
+
+  it("bez historii nie ma strzałki wstecz", async () => {
+    renderAt(crag);
+    await screen.findByRole("link", { name: "Mapa" });
+    expect(screen.queryByRole("button", { name: "Wstecz" })).not.toBeInTheDocument();
   });
 
   it("404 → nie znaleziono", async () => {
