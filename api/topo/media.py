@@ -37,7 +37,8 @@ def store_wall_image(media_root: Path, wall_id: int, data: bytes, number: int | 
         image.load()
     except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as exc:
         raise InvalidImage("Nieprawidłowy plik obrazu") from exc
-    extension = {"JPEG": "jpg"}.get(image.format or "", (image.format or "img").lower())
+    # MPO is a JPEG with extra frames, as phones save them.
+    extension = {"JPEG": "jpg", "MPO": "jpg"}.get(image.format or "", (image.format or "img").lower())
     image = ImageOps.exif_transpose(image).convert("RGB")
 
     relative = Path("walls") / str(wall_id)

@@ -1,8 +1,10 @@
 """Photos uploaded in the app: each one goes to a new numbered folder, so reverting a replacement gets the old one back."""
 
+import io
 from pathlib import Path
 
 from fastapi import UploadFile
+from PIL import Image, UnidentifiedImageError
 from sqlalchemy.orm import Session
 
 from topo.api.errors import ApiError
@@ -11,12 +13,19 @@ from topo.media import InvalidImage, next_photo_number, store_wall_image
 from topo.models import Wall
 
 MAX_UPLOAD = 30 * 1024 * 1024
+FORMATS = {"JPEG", "MPO", "PNG", "WEBP"}  # MPO = a JPEG with extra frames, as phones save them
 
 
 def read_upload(file: UploadFile) -> bytes:
     data = file.file.read(MAX_UPLOAD + 1)
     if len(data) > MAX_UPLOAD:
         raise ApiError(413, "too_large", "Zdjęcie jest większe niż 30 MB")
+    try:
+        image_format = Image.open(io.BytesIO(data)).format
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
+        image_format = None
+    if image_format not in FORMATS:
+        raise ApiError(422, "invalid_image", "Nieprawidłowy plik obrazu — wyślij JPEG, PNG albo WebP")
     return data
 
 

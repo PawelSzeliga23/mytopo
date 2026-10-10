@@ -1,5 +1,5 @@
 from PIL import Image
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from tests import factories as f
 from tests.test_depth import FakeEstimator, FakeSegmenter
@@ -116,3 +116,25 @@ def test_work_processes_queue_then_sleeps(session, tmp_path):
          should_stop=lambda: len(sleeps) >= 1, sleep=sleeps.append, log=lambda _: None)
     assert sleeps == [7]
     assert [j.status for j in jobs(session, wall.id)] == ["done"]
+
+
+class DeletesWall:
+    """Depth model during which someone deletes the wall (its job goes with it, ON DELETE CASCADE)."""
+
+    name = "fake-model"
+
+    def __init__(self, session, wall_id):
+        self.session, self.wall_id = session, wall_id
+
+    def predict(self, image):
+        self.session.execute(delete(Wall).where(Wall.id == self.wall_id))
+        return FakeEstimator().predict(image)
+
+
+def test_wall_deleted_while_running(session, tmp_path):
+    wall = wall_with_photo(session, tmp_path)
+    enqueue_depth(session, wall.id)
+    session.commit()
+    job = claim_job(session)
+    run_job(session, job, tmp_path, DeletesWall(session, wall.id), FakeSegmenter())  # must not raise
+    assert jobs(session, wall.id) == []

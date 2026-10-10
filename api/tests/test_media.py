@@ -70,3 +70,11 @@ def test_invalid_image_creates_no_folder(tmp_path):
     with pytest.raises(InvalidImage):
         store_wall_image(tmp_path, 7, b"", number=1)
     assert not (tmp_path / "walls").exists()
+
+
+def test_phone_mpo_photo_keeps_jpg_extension(tmp_path):
+    buffer = io.BytesIO()
+    Image.new("RGB", (40, 30)).save(buffer, "MPO", save_all=True, append_images=[Image.new("RGB", (40, 30))])
+    assert Image.open(io.BytesIO(buffer.getvalue())).format == "MPO"
+    stored = store_wall_image(tmp_path, 7, buffer.getvalue(), number=1)
+    assert stored.original_path == "walls/7/1/original.jpg"

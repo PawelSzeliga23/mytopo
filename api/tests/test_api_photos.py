@@ -197,3 +197,29 @@ def test_revert_wall_creation(editor, session, media):
     assert editor.post(f"/api/changes/{item['id']}/revert", json={}).status_code == 200
     session.expire_all()
     assert session.get(Wall, wall_id) is None
+
+
+def image_bytes(fmt: str) -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", (40, 30), (1, 2, 3)).save(buffer, fmt)
+    return buffer.getvalue()
+
+
+@pytest.mark.parametrize("fmt", ["GIF", "TIFF", "BMP"])
+def test_only_jpeg_png_webp(editor, session, media, fmt):
+    crag = make_crag(session)
+    response = editor.post(f"/api/crags/{crag.id}/walls", **upload(image_bytes(fmt)))
+    assert response.status_code == 422 and response.json()["code"] == "invalid_image"
+
+
+@pytest.mark.parametrize("fmt", ["PNG", "WEBP"])
+def test_png_and_webp_accepted(editor, session, media, fmt):
+    crag = make_crag(session)
+    assert editor.post(f"/api/crags/{crag.id}/walls", **upload(image_bytes(fmt))).status_code == 201
+
+
+def test_phone_mpo_accepted(editor, session, media):
+    buffer = io.BytesIO()
+    Image.new("RGB", (40, 30)).save(buffer, "MPO", save_all=True, append_images=[Image.new("RGB", (40, 30))])
+    crag = make_crag(session)
+    assert editor.post(f"/api/crags/{crag.id}/walls", **upload(buffer.getvalue())).status_code == 201
