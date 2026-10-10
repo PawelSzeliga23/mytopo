@@ -202,6 +202,6 @@ export function bake(grid: ModelGrid): { width: number; height: number; depth: U
 export function encodeModel(grid: ModelGrid): { depth: Blob; segments: Blob } {
   const baked = bake(grid);
   const png = (data: Uint16Array | Uint8Array, bits: 8 | 16) =>
-    new Blob([encode({ width: baked.width, height: baked.height, data, depth: bits, channels: 1 })], { type: "image/png" });
+    new Blob([new Uint8Array(encode({ width: baked.width, height: baked.height, data, depth: bits, channels: 1 }))], { type: "image/png" });
   return { depth: png(baked.depth, 16), segments: png(baked.cls, 8) };
 }
