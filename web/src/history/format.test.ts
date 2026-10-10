@@ -27,6 +27,12 @@ describe("format", () => {
     expect(formatValue("description", "x".repeat(100))).toBe(`${"x".repeat(80)}…`);
   });
 
+  it("formatuje zdjęcie ściany", () => {
+    expect(FIELD_LABELS.image_path).toBe("zdjęcie");
+    expect(formatValue("image_path", "walls/5/display.webp")).toBe("z importu");
+    expect(formatValue("image_path", "walls/5/3/display.webp")).toBe("wersja 3");
+  });
+
   it("buduje tytuły obiektów", () => {
     expect(objectTitle(object("crag", "updated", "Żabi Koń"))).toBe("Skała");
     expect(objectTitle(object("route", "updated", "Filar"))).toBe("Droga Filar");

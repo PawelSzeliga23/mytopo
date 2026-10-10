@@ -6,6 +6,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
 import { Button } from "@/components/ui/button";
 import { CragInfo } from "@/crag/CragInfo";
+import { DepthStatus } from "@/crag/DepthStatus";
 import { CragEditForm } from "@/crag/edit/CragEditForm";
 import { CragMenu } from "@/crag/edit/CragMenu";
 import { RouteEditPanel } from "@/crag/edit/RouteEditPanel";
@@ -21,6 +22,8 @@ import { useIsDesktop } from "@/lib/useMediaQuery";
 import { formatViewHash } from "@/map/view";
 
 const CRAG_ZOOM = 15;
+/** While a photo waits for its depth map, the crag is fetched again this often: 2.5D appears without a reload. */
+const DEPTH_POLL_MS = 15_000;
 
 export default function CragPage() {
   const { slug = "" } = useParams();
@@ -31,7 +34,11 @@ export default function CragPage() {
   const { isEditor, reauthenticating } = useSession();
   const [editing, setEditing] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const { data: crag, error, isPending } = useQuery({ queryKey: ["crag", slug], queryFn: () => api.crag(slug) });
+  const { data: crag, error, isPending } = useQuery({
+    queryKey: ["crag", slug],
+    queryFn: () => api.crag(slug),
+    refetchInterval: (query) => (query.state.data?.walls.some((w) => w.image_url && w.depth_status === "pending") ? DEPTH_POLL_MS : false),
+  });
   const [wallId, setWallId] = useState<number | null>(null);
   const [selectedRouteId, setSelectedRouteId] = useState<number | null>(null);
   const [hoveredRouteId, setHoveredRouteId] = useState<number | null>(null);
@@ -139,6 +146,7 @@ export default function CragPage() {
             ) : (
               <p className="rounded-[10px] bg-secondary p-4 text-sm text-muted-foreground">Ta skała nie ma jeszcze zdjęć z topo.</p>
             )}
+            {wall && <DepthStatus wall={wall} />}
             {crag.walls.length > 1 && <WallThumbnails walls={crag.walls} activeId={wall?.id ?? null} onSelect={setWallId} />}
           </div>
           <div className="flex flex-col gap-4">

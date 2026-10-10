@@ -23,6 +23,7 @@ export const FIELD_LABELS: Record<string, string> = {
   parent_id: "obszar nadrzędny",
   sort_order: "kolejność",
   kind: "rodzaj",
+  image_path: "zdjęcie",
 };
 
 const MAX_TEXT = 80;
@@ -37,6 +38,11 @@ export function formatValue(field: string, value: unknown): string {
   if (field === "location" && Array.isArray(value)) {
     const [lng, lat] = value as number[];
     return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  }
+  if (field === "image_path" && typeof value === "string") {
+    // walls/{id}/display.webp comes from the import, walls/{id}/{n}/display.webp is the n-th photo uploaded in the app.
+    const number = /^walls\/\d+\/(\d+)\//.exec(value)?.[1];
+    return number ? `wersja ${number}` : "z importu";
   }
   if (typeof value === "boolean") return value ? "tak" : "nie";
   const text = Array.isArray(value) ? value.join(", ") : String(value);

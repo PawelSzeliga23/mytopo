@@ -8,12 +8,13 @@ import { api, type CragDetail, type WallOut } from "@/lib/api";
 import { useEditorMutation } from "@/lib/session";
 import { formatViewHash } from "@/map/view";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { PhotoUploadDialog } from "./PhotoUploadDialog";
 import { ToSectorDialog } from "./ToSectorDialog";
 import { WallEditDialog } from "./WallEditDialog";
 
 const CRAG_ZOOM = 15;
 
-type Open = "wall" | "delete-wall" | "to-sector" | "delete-crag" | null;
+type Open = "wall" | "photo" | "add-wall" | "delete-wall" | "to-sector" | "delete-crag" | null;
 
 interface Props {
   crag: CragDetail;
@@ -57,6 +58,7 @@ export function CragMenu({ crag, wall, onHistory }: Props) {
           {wall && (
             <>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => setOpen("photo")}>{wall.image_url ? "Podmień zdjęcie" : "Dodaj zdjęcie"}</DropdownMenuItem>
               {wall.image_url && (
                 <DropdownMenuItem onSelect={() => navigate(`/skaly/${crag.slug}/topo/${wall.id}`)}>Edytuj topo</DropdownMenuItem>
               )}
@@ -65,6 +67,7 @@ export function CragMenu({ crag, wall, onHistory }: Props) {
             </>
           )}
           <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => setOpen("add-wall")}>Dodaj ścianę</DropdownMenuItem>
           {crag.walls.length > 1 && <DropdownMenuItem onSelect={() => setOpen("to-sector")}>Zamień w sektor</DropdownMenuItem>}
           <DropdownMenuItem variant="destructive" onSelect={() => setOpen("delete-crag")}>
             Usuń skałę
@@ -72,6 +75,8 @@ export function CragMenu({ crag, wall, onHistory }: Props) {
         </DropdownMenuContent>
       </DropdownMenu>
       {open === "wall" && wall && <WallEditDialog wall={wall} onClose={close} />}
+      {open === "photo" && wall && <PhotoUploadDialog crag={crag} wall={wall} onClose={close} />}
+      {open === "add-wall" && <PhotoUploadDialog crag={crag} onClose={close} />}
       {open === "to-sector" && <ToSectorDialog crag={crag} onClose={close} />}
       <ConfirmDialog
         open={open === "delete-wall"}

@@ -320,6 +320,11 @@ export interface SaveLinesBody {
   }[];
 }
 
+export interface WallCreated {
+  id: number;
+  version: number;
+}
+
 export interface SaveLinesResult {
   version: number;
   /** Database id of every object sent with a ref. */
@@ -337,6 +342,11 @@ export function sendJson<T>(method: "POST" | "PUT" | "PATCH" | "DELETE", path: s
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+}
+
+/** A multipart write (photo upload); the browser sets the Content-Type with its boundary. */
+export function sendForm<T>(method: "POST" | "PUT", path: string, form: FormData): Promise<T> {
+  return request<T>(path, { method, credentials: "same-origin", headers: { Accept: "application/json" }, body: form });
 }
 
 function withComment(path: string, comment?: string): string {
@@ -368,6 +378,9 @@ export const api = {
   patchWall: (id: number, patch: WallPatch) => sendJson<PatchResult>("PATCH", `/api/walls/${id}`, patch),
   saveWallLines: (id: number, body: SaveLinesBody) => sendJson<SaveLinesResult>("PUT", `/api/walls/${id}/lines`, body),
   deleteWall: (id: number, comment?: string) => sendJson<void>("DELETE", withComment(`/api/walls/${id}`, comment)),
+  createWall: (cragId: number, form: FormData) => sendForm<WallCreated>("POST", `/api/crags/${cragId}/walls`, form),
+  replaceWallImage: (id: number, form: FormData) => sendForm<WallCreated>("PUT", `/api/walls/${id}/image`, form),
+  retryDepth: (id: number) => sendJson<{ queued: boolean }>("POST", `/api/walls/${id}/depth`),
   createArea: (body: AreaCreate) => sendJson<{ id: number; slug: string }>("POST", "/api/areas", body),
   patchArea: (id: number, patch: AreaPatch) => sendJson<PatchResult>("PATCH", `/api/areas/${id}`, patch),
   deleteArea: (id: number) => sendJson<void>("DELETE", `/api/areas/${id}`),
