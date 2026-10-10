@@ -73,7 +73,10 @@ function median(values: number[]): number {
 /** Collects what a step changes: values from before the first touch of each node. */
 class Recorder {
   private readonly before = new Map<number, [number, number]>();
-  constructor(private readonly grid: ModelGrid) {}
+  private readonly grid: ModelGrid;
+  constructor(grid: ModelGrid) {
+    this.grid = grid;
+  }
 
   set(k: number, depth: number, cls: number) {
     if (!this.before.has(k)) this.before.set(k, [this.grid.depth[k], this.grid.cls[k]]);
@@ -102,7 +105,9 @@ class Recorder {
 /** One drag of a brush: every dab changes the grid at once, `finish` gives the whole drag as one undo step. */
 export class Stroke {
   private readonly recorder: Recorder;
-  constructor(private readonly grid: ModelGrid) {
+  private readonly grid: ModelGrid;
+  constructor(grid: ModelGrid) {
+    this.grid = grid;
     this.recorder = new Recorder(grid);
   }
 
