@@ -2,7 +2,7 @@ import io
 
 import pytest
 from PIL import Image
-from sqlalchemy import select
+from sqlalchemy import delete, select, update
 
 from tests import factories as f
 from topo.config import get_settings
@@ -141,3 +141,59 @@ def test_retry_depth_without_photo(editor, session, media):
     crag = make_crag(session)
     response = editor.post(f"/api/walls/{crag.walls[0].id}/depth")
     assert response.status_code == 422 and response.json()["code"] == "no_image"
+
+
+def photo_history(editor, crag_id):
+    [item, *_] = editor.get("/api/changes", params={"crag": crag_id}).json()["items"]
+    return item
+
+
+def test_replace_shows_in_history_and_reverts(editor, session, media):
+    crag = make_crag(session)
+    wall_id = crag.walls[0].id
+    editor.put(f"/api/walls/{wall_id}/image", **upload())
+    Image.new("I;16", (32, 24)).save(media / "walls" / str(wall_id) / "1" / "depth.png")  # the worker computed photo 1
+    session.execute(
+        update(Wall).where(Wall.id == wall_id).values(depth_status="ready", depth_path=f"walls/{wall_id}/1/depth.png")
+    )
+    session.commit()
+    editor.put(f"/api/walls/{wall_id}/image", **upload(jpeg(800, 600)))
+
+    item = photo_history(editor, crag.id)
+    [wall_change] = [o for o in item["objects"] if o["kind"] == "wall"]
+    assert [(d["field"], d["before"], d["after"]) for d in wall_change["diffs"]] == [
+        ("image_path", f"walls/{wall_id}/1/display.webp", f"walls/{wall_id}/2/display.webp")
+    ]
+
+    assert editor.post(f"/api/changes/{item['id']}/revert", json={}).status_code == 200
+    session.expire_all()
+    wall = session.get(Wall, wall_id)
+    assert (wall.image_path, wall.thumb_path) == (f"walls/{wall_id}/1/display.webp", f"walls/{wall_id}/1/thumb.webp")
+    assert wall.image_original_path == f"walls/{wall_id}/1/original.jpg"
+    assert (wall.image_width, wall.image_height) == (640, 480)
+    assert (wall.depth_status, wall.depth_path) == ("ready", f"walls/{wall_id}/1/depth.png")
+
+
+def test_revert_to_photo_without_depth_queues_job(editor, session, media):
+    crag = make_crag(session)
+    wall_id = crag.walls[0].id
+    editor.put(f"/api/walls/{wall_id}/image", **upload())
+    editor.put(f"/api/walls/{wall_id}/image", **upload())
+    session.execute(delete(DepthJob))
+    session.commit()
+    item = photo_history(editor, crag.id)
+    assert editor.post(f"/api/changes/{item['id']}/revert", json={}).status_code == 200
+    session.expire_all()
+    wall = session.get(Wall, wall_id)
+    assert (wall.image_path, wall.depth_status) == (f"walls/{wall_id}/1/display.webp", "pending")
+    assert queued(session, wall_id) == ["queued"]
+
+
+def test_revert_wall_creation(editor, session, media):
+    crag = make_crag(session)
+    wall_id = editor.post(f"/api/crags/{crag.id}/walls", **upload(name="Lewa")).json()["id"]
+    item = photo_history(editor, crag.id)
+    assert any(o["kind"] == "wall" and o["op"] == "created" for o in item["objects"]), item["objects"]
+    assert editor.post(f"/api/changes/{item['id']}/revert", json={}).status_code == 200
+    session.expire_all()
+    assert session.get(Wall, wall_id) is None

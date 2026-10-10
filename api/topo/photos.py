@@ -21,7 +21,10 @@ def read_upload(file: UploadFile) -> bytes:
 
 
 def set_photo(session: Session, wall: Wall, data: bytes, media_root: Path) -> None:
-    """Stores the photo, points the wall at it, clears what was derived from the old one and queues its depth."""
+    """Stores the photo, points the wall at it, clears what was derived from the old one and queues its depth.
+
+    The fields are set before the job is added: for a new wall the first flush then inserts it with its photo.
+    """
     try:
         stored = store_wall_image(media_root, wall.id, data, next_photo_number(media_root, wall.id))
     except InvalidImage as exc:

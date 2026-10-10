@@ -16,7 +16,7 @@ from topo.schemas import ChangeOut, CragRef, FieldDiffOut, ObjectChangeOut
 MODELS: list[type] = [Area, Crag, Wall, Route, RouteLine, LinePoint]  # parent -> child
 KIND = {Area: "area", Crag: "crag", Wall: "wall", Route: "route", RouteLine: "line", LinePoint: "point"}
 SKIP_FIELDS = frozenset({
-    "version", "source", "source_id", "source_url", "grade_sort", "image_original_path", "image_path", "thumb_path",
+    "version", "source", "source_id", "source_url", "grade_sort", "image_original_path", "thumb_path",
     "image_width", "image_height", "depth_path", "depth_status", "depth_model", "vegetation_ratio",
     "route_vegetation_ratio", "depth_enabled", "needs_location",
 })

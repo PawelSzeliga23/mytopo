@@ -18,6 +18,7 @@ from sqlalchemy_continuum import version_class
 from topo.changes import KIND, ObjectChange, transaction_changes, version_values
 from topo.db import refresh_area_geom
 from topo.depth import DEPTH_FILE, SEGMENTS_FILE, photo_folder, update_wall_fields, vegetation_stats
+from topo.depth_queue import enqueue_depth
 from topo.editing import apply_grade, delete_crag, delete_line, delete_route, delete_wall, location_from, location_of
 from topo.history import current_transaction_id, set_author, transaction_class
 from topo.models import Area, Crag, LinePoint, Route, RouteLine, Wall
@@ -47,6 +48,8 @@ CHILDREN: dict[type, list[tuple[type, str]]] = {
     LinePoint: [],
 }
 VARIANT_FIELDS = ("parent_line_id", "parent_point_id")
+# A photo is one value for history: image_path stands for the whole group, which is restored together.
+PHOTO_FIELDS = ("image_original_path", "thumb_path", "image_width", "image_height")
 _LABEL = {"area": "obszar", "crag": "skałę", "wall": "ścianę", "route": "drogę", "line": "linię", "point": "punkt"}
 _DELETE: dict[type, Callable[[Session, Any], None]] = {
     Crag: delete_crag, Wall: delete_wall, Route: delete_route, RouteLine: delete_line,
@@ -192,6 +195,8 @@ class _Planner:
                 if not self.force:
                     continue
             values[diff.field] = diff.before
+        if change.model is Wall and "image_path" in values:
+            values.update({name: change.before[name] for name in PHOTO_FIELDS})
         self.check_references(change.model, obj, values)
         if values:
             self.plan.restores[change.model, change.id] = (obj, values)
@@ -318,6 +323,8 @@ def _restore_depth(session: Session, wall_ids: list[int], media_root: Path) -> N
             lines = [[(point.x, point.y) for point in line.points] for line in wall.lines]
             values["vegetation_ratio"], values["route_vegetation_ratio"] = vegetation_stats(classes, lines)
         update_wall_fields(session, wall_id, **values)
+        if wall.image_path and (values["depth_status"] != "ready" or values["vegetation_ratio"] is None):
+            enqueue_depth(session, wall_id)  # the worker computes what the files lack
 
 
 def revert_transaction(
@@ -339,7 +346,8 @@ def revert_transaction(
         _insert(session, plan.inserts)
         _restore(session, plan.restores)
         _delete(session, plan.deletes)
-        _restore_depth(session, [c.id for c in plan.inserts if c.model is Wall], media_root)
+        photos = [key[1] for key, (_, values) in plan.restores.items() if key[0] is Wall and "image_path" in values]
+        _restore_depth(session, [c.id for c in plan.inserts if c.model is Wall] + photos, media_root)
         # An open topo editor must notice that the lines under it changed.
         bump_wall_versions(session, walls_touched(session, changes))
         refresh_area_geom(session)

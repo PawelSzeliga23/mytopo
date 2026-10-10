@@ -4,7 +4,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, Query, Response, UploadFile
 from geoalchemy2.shape import to_shape
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session, selectinload
 
 from topo.api.common import area_path, media_url
@@ -228,11 +228,14 @@ def create_wall(
     data = read_upload(file)
     start_change(session, nick, comment)
     last = session.scalar(select(func.max(Wall.sort_order)).where(Wall.crag_id == crag.id))
+    # The id comes first (its photo folder needs it), so the wall is inserted once, photo included: history then
+    # records a created wall rather than an insert followed by an update.
+    wall_id = session.scalar(text("SELECT nextval(pg_get_serial_sequence('wall', 'id'))"))
     wall = Wall(
-        crag_id=crag.id, name=(name or "").strip() or None, sort_order=0 if last is None else last + 1, source="manual"
+        id=wall_id, crag_id=crag.id, name=(name or "").strip() or None, sort_order=0 if last is None else last + 1,
+        source="manual",
     )
     session.add(wall)
-    session.flush()
     set_photo(session, wall, data, Path(get_settings().media_root))
     session.commit()
     return {"id": wall.id, "version": wall.version}
