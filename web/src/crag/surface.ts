@@ -89,7 +89,14 @@ export function buildSurface(depth: Raster, classes: Uint8Array | null): Surface
       uvs[2 * k + 1] = 1 - v;
     }
   }
-  const solid = (k: number) => cls[k] === ROCK || cls[k] === GROUND;
+  return { gx, gy, ...size, depth: nodeDepth, cls, positionsXY, uvs, index: solidIndex(cls, gx, gy) };
+}
+
+export const isSolid = (cls: number) => cls === ROCK || cls === GROUND;
+
+/** Triangles of the grid whose three nodes are rock or ground (sky, trees and background are left out). */
+export function solidIndex(cls: ArrayLike<number>, gx: number, gy: number): Uint32Array {
+  const nx = gx + 1;
   const index: number[] = [];
   for (let j = 0; j < gy; j++) {
     for (let i = 0; i < gx; i++) {
@@ -97,11 +104,11 @@ export function buildSurface(depth: Raster, classes: Uint8Array | null): Surface
       const b = a + 1;
       const c = a + nx;
       const d = c + 1;
-      if (solid(a) && solid(c) && solid(b)) index.push(a, c, b);
-      if (solid(b) && solid(c) && solid(d)) index.push(b, c, d);
+      if (isSolid(cls[a]) && isSolid(cls[c]) && isSolid(cls[b])) index.push(a, c, b);
+      if (isSolid(cls[b]) && isSolid(cls[c]) && isSolid(cls[d])) index.push(b, c, d);
     }
   }
-  return { gx, gy, ...size, depth: nodeDepth, cls, positionsXY, uvs, index: Uint32Array.from(index) };
+  return Uint32Array.from(index);
 }
 
 /** Depth at a photo point (x, y in 0–1): median of the 5×5 nodes around it, so one branch node cannot pull a route forward. */
