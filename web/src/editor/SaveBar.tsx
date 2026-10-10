@@ -9,12 +9,14 @@ interface SaveButtonProps {
   blocked: string | null;
   pending: boolean;
   onSave(comment: string | null): void;
+  /** Title of the comment dialog. */
+  title?: string;
 }
 
 const changesLabel = (count: number) => (count === 1 ? "1 zmiana" : count < 5 ? `${count} zmiany` : `${count} zmian`);
 
 /** "Zapisz (n zmian)": asks for an optional comment, then saves the whole photo as one history entry. */
-export function SaveButton({ count, blocked, pending, onSave }: SaveButtonProps) {
+export function SaveButton({ count, blocked, pending, onSave, title = "Zapisać topo?" }: SaveButtonProps) {
   const [open, setOpen] = useState(false);
   const [comment, setComment] = useState("");
   const disabled = count === 0 || blocked !== null || pending;
@@ -26,7 +28,7 @@ export function SaveButton({ count, blocked, pending, onSave }: SaveButtonProps)
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Zapisać topo?</DialogTitle>
+            <DialogTitle>{title}</DialogTitle>
             <DialogDescription>{changesLabel(count)} trafi do historii jako jeden wpis.</DialogDescription>
           </DialogHeader>
           <form

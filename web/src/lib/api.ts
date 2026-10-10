@@ -92,6 +92,16 @@ export interface WallOut {
   /** Show 2.5D by default: depth ready and the rock not overgrown (or switched on by hand). */
   show_3d: boolean;
   vegetation_ratio: number | null;
+  /** Manual 2.5D switch: null = by vegetation, true = always, false = never. */
+  depth_enabled: boolean | null;
+  /** Hologram colours ("#rrggbb"); null = the default ones. */
+  rock_color: string | null;
+  ground_color: string | null;
+  /** Version of the model edited by hand (depth_url and segments_url point to it); null = as computed. */
+  model_version: number | null;
+  /** The worker's rasters, for the editor's "restore" brush. */
+  original_depth_url: string | null;
+  original_segments_url: string | null;
   lines: LineOut[];
 }
 
@@ -325,6 +335,11 @@ export interface WallCreated {
   version: number;
 }
 
+export interface ModelSaved {
+  model_version: number | null;
+  changed: string[];
+}
+
 export interface SaveLinesResult {
   version: number;
   /** Database id of every object sent with a ref. */
@@ -381,6 +396,7 @@ export const api = {
   createWall: (cragId: number, form: FormData) => sendForm<WallCreated>("POST", `/api/crags/${cragId}/walls`, form),
   replaceWallImage: (id: number, form: FormData) => sendForm<WallCreated>("PUT", `/api/walls/${id}/image`, form),
   retryDepth: (id: number) => sendJson<{ queued: boolean }>("POST", `/api/walls/${id}/depth`),
+  saveWallModel: (id: number, form: FormData) => sendForm<ModelSaved>("PUT", `/api/walls/${id}/model`, form),
   createArea: (body: AreaCreate) => sendJson<{ id: number; slug: string }>("POST", "/api/areas", body),
   patchArea: (id: number, patch: AreaPatch) => sendJson<PatchResult>("PATCH", `/api/areas/${id}`, patch),
   deleteArea: (id: number) => sendJson<void>("DELETE", `/api/areas/${id}`),

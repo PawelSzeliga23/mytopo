@@ -27,6 +27,15 @@ describe("format", () => {
     expect(formatValue("description", "x".repeat(100))).toBe(`${"x".repeat(80)}…`);
   });
 
+  it("formatuje pola modelu 2.5D", () => {
+    expect([FIELD_LABELS.model_path, FIELD_LABELS.rock_color, FIELD_LABELS.depth_enabled]).toEqual(["model 2.5D", "kolor skały", "2.5D"]);
+    expect(formatValue("model_path", null)).toBe("oryginał");
+    expect(formatValue("model_path", "walls/5/1/model-3")).toBe("wersja 3");
+    expect(formatValue("rock_color", null)).toBe("domyślny");
+    expect(formatValue("ground_color", "#aabbcc")).toBe("#aabbcc");
+    expect([true, false, null].map((v) => formatValue("depth_enabled", v))).toEqual(["zawsze", "nigdy", "auto"]);
+  });
+
   it("formatuje zdjęcie ściany", () => {
     expect(FIELD_LABELS.image_path).toBe("zdjęcie");
     expect(formatValue("image_path", "walls/5/display.webp")).toBe("z importu");

@@ -23,12 +23,12 @@ const vertexShader = /* glsl */ `
   }`;
 
 /** Shaded relief with faint depth contours, muted on purpose: the routes are the bright elements. */
-export function createHologramMaterial(): THREE.ShaderMaterial {
+export function createHologramMaterial(rockColor: string | null = null, groundColor: string | null = null): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     side: THREE.DoubleSide,
     uniforms: {
-      rock: { value: new THREE.Color(ROCK_COLOR) },
-      ground: { value: new THREE.Color(GROUND_COLOR) },
+      rock: { value: new THREE.Color(rockColor ?? ROCK_COLOR) },
+      ground: { value: new THREE.Color(groundColor ?? GROUND_COLOR) },
       levels: { value: 40 },
     },
     vertexShader,

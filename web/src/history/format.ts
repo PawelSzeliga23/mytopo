@@ -24,6 +24,10 @@ export const FIELD_LABELS: Record<string, string> = {
   sort_order: "kolejność",
   kind: "rodzaj",
   image_path: "zdjęcie",
+  model_path: "model 2.5D",
+  rock_color: "kolor skały",
+  ground_color: "kolor podłoża",
+  depth_enabled: "2.5D",
 };
 
 const MAX_TEXT = 80;
@@ -32,6 +36,9 @@ const METERS = new Set(["length_m", "height_min", "height_max"]);
 export const fieldLabel = (field: string) => FIELD_LABELS[field] ?? field;
 
 export function formatValue(field: string, value: unknown): string {
+  if (field === "depth_enabled") return value === true ? "zawsze" : value === false ? "nigdy" : "auto";
+  if (field === "model_path") return typeof value === "string" ? `wersja ${value.split("-").pop()}` : "oryginał";
+  if ((field === "rock_color" || field === "ground_color") && !value) return "domyślny";
   if (value === null || value === undefined || value === "" || (Array.isArray(value) && value.length === 0)) return "—";
   if (field === "approach_minutes") return `${value} min`;
   if (METERS.has(field)) return `${value} m`;

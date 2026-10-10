@@ -62,6 +62,9 @@ export function CragMenu({ crag, wall, onHistory }: Props) {
               {wall.image_url && (
                 <DropdownMenuItem onSelect={() => navigate(`/skaly/${crag.slug}/topo/${wall.id}`)}>Edytuj topo</DropdownMenuItem>
               )}
+              {wall.depth_status === "ready" && (
+                <DropdownMenuItem onSelect={() => navigate(`/skaly/${crag.slug}/model/${wall.id}`)}>Edytuj model 2.5D</DropdownMenuItem>
+              )}
               <DropdownMenuItem onSelect={() => setOpen("wall")}>Ściana: nazwa i opis</DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setOpen("delete-wall")}>Usuń ścianę</DropdownMenuItem>
             </>

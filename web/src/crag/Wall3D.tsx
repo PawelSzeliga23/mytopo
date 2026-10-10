@@ -115,7 +115,7 @@ function SurfaceMesh({ surface, relief, material }: { surface: Surface; relief: 
 }
 
 /** Frames what is drawn (rock and ground, not the removed sky), whatever the container's shape. */
-function FitCamera({ surface }: { surface: Surface }) {
+export function FitCamera({ surface }: { surface: Surface }) {
   const { camera, size, controls } = useThree();
   const bounds = useMemo(() => {
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -187,7 +187,7 @@ function RouteNumber({ position, layer, text, fill, textColor, opacity, handlers
   );
 }
 
-function RouteLines({ items, surface, relief, onChoose, onHoverRoute }: {
+export function RouteLines({ items, surface, relief, onChoose, onHoverRoute }: {
   items: SceneLine[];
   surface: Surface;
   relief: number;
@@ -249,7 +249,7 @@ export default function Wall3D({ wall, routes, selectedRouteId, hoveredRouteId, 
   const { theme } = useTheme();
   const surface = useSurface(wall, onFail);
   const photo = usePhoto(wall.image_url, look === "photo");
-  const hologram = useMemo(() => createHologramMaterial(), []);
+  const hologram = useMemo(() => createHologramMaterial(wall.rock_color, wall.ground_color), [wall.rock_color, wall.ground_color]);
   const photoMaterial = useMemo(() => (photo ? createPhotoMaterial(photo) : null), [photo]);
   useEffect(() => () => hologram.dispose(), [hologram]);
   useEffect(() => () => photoMaterial?.dispose(), [photoMaterial]);
