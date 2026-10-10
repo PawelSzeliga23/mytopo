@@ -51,3 +51,14 @@
 - [ ] Całe testy; przegląd w przeglądarce (Playwright): wyszukiwanie, strona regionu, zmiany bez logowania.
 - [ ] Przegląd gałęzi, poprawki (RED→GREEN).
 - [ ] „Wnioski z wykonania”; uruchomienie API + front + worker; pytanie o scalenie.
+
+---
+
+## Wnioski z wykonania
+
+- Wykonanie inline; mockupy w towarzyszu wizualnym (wariant A wyszukiwarki i strony obszaru); przegląd gałęzi samodzielny z testem w przeglądarce (Playwright, baza dev).
+- Błąd znaleziony w przeglądarce: koniec ruchu mapy (`onMoveEnd`) po przejściu na stronę skały podmieniał adres na `#widok` i gubił `?droga` / `?sciana` — mapa zapisuje widok w adresie tylko, gdy nadal jest na `/`.
+- Filtr obszaru w wyszukiwarce to zwykła lista (regiony jako grupy, sektory pod nimi) — przeglądarka sama przeskakuje po wpisanych literach.
+- „Lista skał” w karcie mapy jest przekazywana jako akcja (karta bywa renderowana bez routera w testach).
+- `GET /api/auth/me` bez logowania zwraca `{"nick": null}` — koniec błędów 401 w konsoli.
+- Odłożone drobiazgi: pole wyszukiwania na telefonie jest wąskie (obok ⟲ i „Edytuj”); ściany nazwane tak samo jak skała pojawiają się w podpowiedziach obok skały; konflikty cofania (okno) pokazują jeszcze numery obszarów zamiast nazw; zapytanie dla krótkich fraz trwa ~0,2 s (bez indeksu trigramowego).
