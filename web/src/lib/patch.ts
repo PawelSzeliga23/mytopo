@@ -1,6 +1,8 @@
-/** An empty text is the same as "no value" — the API stores it as null. */
+/** Spaces around a text do not count, and an empty text is the same as "no value" — the API stores it as null. */
 function normalize(value: unknown): unknown {
-  return value === "" ? null : value;
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  return trimmed === "" ? null : trimmed;
 }
 
 function same(a: unknown, b: unknown): boolean {

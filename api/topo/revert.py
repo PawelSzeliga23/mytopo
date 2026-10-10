@@ -17,7 +17,7 @@ from sqlalchemy_continuum import version_class
 
 from topo.changes import KIND, ObjectChange, transaction_changes, version_values
 from topo.db import refresh_area_geom
-from topo.depth import DEPTH_FILE, SEGMENTS_FILE, photo_folder, update_wall_fields, vegetation_stats
+from topo.depth import DEPTH_FILE, SEGMENTS_FILE, model_files, photo_folder, update_wall_fields, vegetation_stats
 from topo.depth_queue import enqueue_depth
 from topo.editing import apply_grade, delete_crag, delete_line, delete_route, delete_wall, location_from, location_of
 from topo.history import current_transaction_id, set_author, transaction_class
@@ -27,6 +27,7 @@ from topo.editing import bump_wall_versions
 from topo.topo_edit import walls_touched
 
 Mode = Literal["check", "safe", "all"]
+REVERT_LOCK = 0x70_0001  # pg_advisory_xact_lock key held while a revert runs
 
 # Columns pointing at other restorable objects: (model, column). The first one is the required parent
 # (Area.parent_id may be empty); RouteLine.route_id and the variant branch point are optional.
@@ -317,8 +318,10 @@ def _restore_depth(session: Session, wall_ids: list[int], media_root: Path) -> N
         }  # fmt: skip
         if (folder / DEPTH_FILE).exists():
             values.update(depth_status="ready", depth_path=(relative / DEPTH_FILE).as_posix())
-        if (folder / SEGMENTS_FILE).exists():
-            with Image.open(folder / SEGMENTS_FILE) as image:
+        # The vegetation comes from the segmentation shown: the model edited by hand, else the worker's.
+        segments = media_root / model_files(wall.model_path)[1] if wall.model_path else folder / SEGMENTS_FILE
+        if segments.exists():
+            with Image.open(segments) as image:
                 classes = np.array(image)
             lines = [[(point.x, point.y) for point in line.points] for line in wall.lines]
             values["vegetation_ratio"], values["route_vegetation_ratio"] = vegetation_stats(classes, lines)
@@ -335,6 +338,8 @@ def revert_transaction(
     "check" raises RevertConflict when anything changed later (nothing is written); "safe" skips the conflicting
     fields and objects; "all" overwrites them.
     """
+    # One revert at a time: two at once could restore the same row twice (unique key error instead of a conflict).
+    session.execute(sa.text("SELECT pg_advisory_xact_lock(:key)"), {"key": REVERT_LOCK})
     changes = transaction_changes(session, tx_id)
     note = f"cofnięcie #{tx_id}" + (f": {comment.strip()}" if comment and comment.strip() else "")
     set_author(session, nick, note[:500], reverts_id=tx_id)
@@ -346,7 +351,10 @@ def revert_transaction(
         _insert(session, plan.inserts)
         _restore(session, plan.restores)
         _delete(session, plan.deletes)
-        photos = [key[1] for key, (_, values) in plan.restores.items() if key[0] is Wall and "image_path" in values]
+        photos = [
+            key[1] for key, (_, values) in plan.restores.items()
+            if key[0] is Wall and ("image_path" in values or "model_path" in values)
+        ]  # fmt: skip
         _restore_depth(session, [c.id for c in plan.inserts if c.model is Wall] + photos, media_root)
         # An open topo editor must notice that the lines under it changed.
         bump_wall_versions(session, walls_touched(session, changes))

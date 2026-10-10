@@ -17,6 +17,10 @@ describe("changedFields", () => {
     expect(changedFields({ description: "opis" as string | null }, { description: "" })).toEqual({ description: "" });
   });
 
+  it("nie liczy samych spacji jako zmiany", () => {
+    expect(changedFields({ name: "Filar", description: null as string | null }, { name: "Filar ", description: "  " })).toEqual({});
+  });
+
   it("porównuje tablice po zawartości", () => {
     expect(changedFields({ aspects: ["S"] }, { aspects: ["S"] })).toEqual({});
     expect(changedFields({ aspects: ["S"] }, { aspects: ["S", "W"] })).toEqual({ aspects: ["S", "W"] });

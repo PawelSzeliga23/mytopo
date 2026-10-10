@@ -107,6 +107,8 @@ def test_fetch_error_for_one_rock_does_not_stop_import(session, tmp_path):
 
 
 def test_only_area_and_limit(session, tmp_path):
+    run(session, tmp_path, only_area="Dolina")  # a part of an area name is not enough
+    assert count(session, Crag) == 0
     run(session, tmp_path, only_area="Dolina Kobylańska")
     assert session.scalars(select(Crag.name)).all() == ["Żabi Koń"]
 

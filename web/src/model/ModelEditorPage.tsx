@@ -127,6 +127,8 @@ function ModelEditor({ crag, wall, grid }: { crag: CragDetail; wall: WallOut; gr
   const [settings, setSettings] = useState<Settings>(initial);
   const [savedSettings, setSavedSettings] = useState<Settings>(initial);
   const [baseModel, setBaseModel] = useState<number | null>(wall.model_version);
+  // The photo the model was loaded for: a photo replaced meanwhile makes the server refuse the save.
+  const [basePhoto] = useState(wall.image_url);
   const [conflict, setConflict] = useState<{ comment: string | null; current: number | null } | null>(null);
   const [leaving, setLeaving] = useState(false);
 
@@ -169,6 +171,7 @@ function ModelEditor({ crag, wall, grid }: { crag: CragDetail; wall: WallOut; gr
   const submit = (comment: string | null, base: number | null) => {
     const form = new FormData();
     form.append("base_model", base === null ? "" : String(base));
+    if (basePhoto) form.append("base_photo", basePhoto);
     if (stepChanges > 0) {
       const files = encodeModel(grid);
       form.append("depth", files.depth, "depth.png");

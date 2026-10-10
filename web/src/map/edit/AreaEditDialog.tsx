@@ -55,7 +55,7 @@ function AreaForm({ area, description, onClose, onDone }: Props & { description:
         </DialogHeader>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="area-name">Nazwa</Label>
-          <Input id="area-name" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
+          <Input id="area-name" required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="area-description">Opis</Label>
@@ -82,7 +82,8 @@ function AreaForm({ area, description, onClose, onDone }: Props & { description:
         confirmLabel="Usuń"
         destructive
         pending={remove.isPending}
-        onConfirm={() => remove.mutate(undefined)}
+        // A failed delete (the area is not empty) shows its message; the question closes with it.
+        onConfirm={() => remove.mutate(undefined, { onError: () => setConfirmDelete(false) })}
         onCancel={() => setConfirmDelete(false)}
       />
     </>

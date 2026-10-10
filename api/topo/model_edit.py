@@ -7,7 +7,7 @@ from pathlib import Path, PurePosixPath
 import numpy as np
 from PIL import Image, UnidentifiedImageError
 
-from topo.depth import GROUND, model_files, photo_folder
+from topo.depth import GROUND, model_files, photo_folder, vegetation_stats
 from topo.models import Wall
 
 MAX_MODEL_UPLOAD = 30 * 1024 * 1024
@@ -58,6 +58,12 @@ def store_model(media_root: Path, wall: Wall, depth: bytes, segments: bytes) -> 
     (Path(media_root) / depth_file).write_bytes(depth)
     (Path(media_root) / segments_file).write_bytes(segments)
     return model_path
+
+
+def model_vegetation(segments: bytes, wall: Wall) -> tuple[float, float | None]:
+    """Vegetation shares (as in the worker) from a checked segmentation raster."""
+    _, classes = _open(segments, "Segmentacja")
+    return vegetation_stats(classes, [[(point.x, point.y) for point in line.points] for line in wall.lines])
 
 
 def original_size(media_root: Path, wall: Wall) -> tuple[int, int]:

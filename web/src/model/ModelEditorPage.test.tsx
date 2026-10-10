@@ -118,6 +118,7 @@ describe("ModelEditorPage", () => {
     const { url, form } = calls[0];
     expect(url).toBe(`/api/walls/${wall.id}/model`);
     expect(form.get("base_model")).toBe("");
+    expect(form.get("base_photo")).toBe(wall.image_url);
     expect(form.get("comment")).toBe("bez drzewa");
     expect(form.get("depth")).toBeInstanceOf(Blob);
     expect(form.get("segments")).toBeInstanceOf(Blob);

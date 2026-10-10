@@ -93,6 +93,20 @@ def test_conflict_then_safe_then_all(editor, session):
     assert (route.grade, route.grade_sort, route.description) == ("VI", grade_sort("VI"), None)
 
 
+def test_conflict_names_areas(editor, session):
+    crag, region = make_crag(session)
+    other, third = f.area(session, "Dolina Będkowska"), f.area(session, "Dolina Racławki")
+    session.commit()
+    editor.patch(f"/api/crags/{crag.id}", json={"area_id": other.id})
+    ania = tx_id(session)
+    login_as(editor, "bartek")
+    editor.patch(f"/api/crags/{crag.id}", json={"area_id": third.id})
+    login_as(editor, "ania")
+
+    [conflict] = revert(editor, ania).json()["conflicts"]
+    assert (conflict["field"], conflict["current"], conflict["restored"]) == ("area_id", "Dolina Racławki", "Dolina Kobylańska")
+
+
 def test_restore_deleted_crag_with_depth_files(editor, session, tmp_path, monkeypatch):
     monkeypatch.setenv("MEDIA_ROOT", str(tmp_path))
     get_settings.cache_clear()

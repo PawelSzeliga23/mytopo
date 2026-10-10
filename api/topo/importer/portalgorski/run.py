@@ -76,8 +76,9 @@ def _restore(report: ImportReport, snapshot: ImportReport) -> None:
 
 def _select(rocks: list[RockRef], only_area: str | None, limit: int | None) -> list[RockRef]:
     if only_area:
+        # The address lists the rock and its areas separated by commas: match one of them as a whole.
         needle = slugify(only_area)
-        rocks = [rock for rock in rocks if needle in slugify(rock.url)]
+        rocks = [rock for rock in rocks if needle in {slugify(part) for part in rock.url.rsplit("/", 1)[-1].split(",")}]
     return rocks[:limit] if limit is not None else rocks
 
 

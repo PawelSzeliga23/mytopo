@@ -155,14 +155,14 @@ it("?droga= z wyszukiwarki otwiera zdjęcie z tą drogą i ją zaznacza", async 
 
   it("← Mapa wraca do mapy, z której przyszliśmy", async () => {
     const router = renderAt(crag, ["/#12.00/50.10000/19.70000", "/skaly/brzuchata-turniczka"]);
-    await userEvent.click(await screen.findByRole("button", { name: "← Mapa" }));
+    await userEvent.click(await screen.findByRole("link", { name: "← Mapa" }));
     expect(await screen.findByText("Mapa")).toBeInTheDocument();
     expect(router.state.location.hash).toBe("#12.00/50.10000/19.70000");
   });
 
   it("← Mapa po wejściu z linku: mapa przy skale", async () => {
     const router = renderAt(crag);
-    await userEvent.click(await screen.findByRole("button", { name: "← Mapa" }));
+    await userEvent.click(await screen.findByRole("link", { name: "← Mapa" }));
     expect(await screen.findByText("Mapa")).toBeInTheDocument();
     expect(router.state.location.hash).toBe("#15.00/50.16614/19.76472");
   });

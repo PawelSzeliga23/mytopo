@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Form, Query, Response, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from topo.api.common import media_url
 from topo.api.deps import current_editor, start_change
 from topo.api.errors import ApiError, raise_not_found
 from topo.config import get_settings
@@ -12,7 +13,7 @@ from topo.db import get_session
 from topo.depth import model_number, update_wall_fields
 from topo.depth_queue import enqueue_depth
 from topo.editing import apply_fields, delete_wall
-from topo.model_edit import MAX_MODEL_UPLOAD, InvalidModel, check_model, original_size, store_model
+from topo.model_edit import MAX_MODEL_UPLOAD, InvalidModel, check_model, model_vegetation, original_size, store_model
 from topo.models import Wall
 from topo.photos import read_upload, set_photo
 from topo.schemas_edit import DeleteBody, WallLinesIn, WallPatch
@@ -110,6 +111,7 @@ SWITCH = {"auto": None, "on": True, "off": False}
 def save_model(
     wall_id: int,
     base_model: Annotated[str, Form(pattern=r"^\d*$")] = "",
+    base_photo: Annotated[str | None, Form()] = None,
     depth: UploadFile | None = None,
     segments: UploadFile | None = None,
     rock_color: Color = None,
@@ -124,6 +126,9 @@ def save_model(
     wall = session.get(Wall, wall_id, with_for_update=True) or raise_not_found("ściana")
     if wall.depth_status != "ready" or wall.depth_path is None:
         raise ApiError(422, "no_depth", "Ta ściana nie ma jeszcze modelu 2.5D")
+    if base_photo is not None and base_photo != media_url(wall.image_path):
+        # A new photo resets the model number, so only the photo shows the edit was made on the old one.
+        raise ApiError(409, "photo_changed", "Zdjęcie ściany podmieniono w międzyczasie — otwórz edytor modelu od nowa")
     current = model_number(wall.model_path)
     if (int(base_model) if base_model else None) != current:
         session.rollback()
@@ -152,6 +157,9 @@ def save_model(
     if rasters is not None:
         wall.model_path = store_model(media_root, wall, *rasters)
         changed.add("model_path")
+        # The automatic 2.5D decision follows the vegetation of the corrected segmentation.
+        ratio, route_ratio = model_vegetation(rasters[1], wall)
+        update_wall_fields(session, wall.id, vegetation_ratio=ratio, route_vegetation_ratio=route_ratio)
     if not changed:
         session.rollback()
         return {"model_version": current, "changed": []}

@@ -223,8 +223,13 @@ def process_wall(
             session, wall, depth_path=(folder / DEPTH_FILE).as_posix(), depth_status="ready", depth_model=estimator.name
         )
     if need_segments:
-        classes = compute_segments(image, segmenter)
-        Image.fromarray(classes).save(Path(media_root) / folder / SEGMENTS_FILE)
+        try:
+            classes = compute_segments(image, segmenter)
+            Image.fromarray(classes).save(Path(media_root) / folder / SEGMENTS_FILE)
+        except Exception:
+            # Without segments the model has no rock outline: "failed" offers the editors a retry.
+            set_wall_fields(session, wall, depth_status="failed")
+            raise
         lines = [[(point.x, point.y) for point in line.points] for line in wall.lines]
         ratio, route_ratio = vegetation_stats(classes, lines)
         set_wall_fields(session, wall, vegetation_ratio=ratio, route_vegetation_ratio=route_ratio)

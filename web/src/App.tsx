@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { lazy, Suspense } from "react";
-import { createBrowserRouter, RouterProvider } from "react-router";
+import { lazy, Suspense, type ComponentType } from "react";
+import { createBrowserRouter, RouterProvider, useParams } from "react-router";
 import { Toaster } from "@/components/ui/sonner";
+import { ApiError } from "@/lib/api";
 import { SessionProvider } from "@/lib/session";
 import { ThemeProvider } from "@/lib/theme";
 import MapPage from "@/map/MapPage";
@@ -13,13 +14,19 @@ const AreaPage = lazy(() => import("@/pages/AreaPage"));
 const EditorPage = lazy(() => import("@/editor/EditorPage"));
 const ModelEditorPage = lazy(() => import("@/model/ModelEditorPage"));
 
+/** A page per slug: going from one crag or area to another starts with fresh state. */
+function BySlug({ page: Page }: { page: ComponentType }) {
+  const { slug } = useParams();
+  return <Page key={slug} />;
+}
+
 const router = createBrowserRouter([
   { path: "/", element: <MapPage /> },
   {
     path: "/skaly/:slug",
     element: (
       <Suspense fallback={<p className="p-4 text-muted-foreground">Wczytywanie…</p>}>
-        <CragPage />
+        <BySlug page={CragPage} />
       </Suspense>
     ),
   },
@@ -43,7 +50,7 @@ const router = createBrowserRouter([
     path: "/obszary/:slug",
     element: (
       <Suspense fallback={<p className="p-4 text-muted-foreground">Wczytywanie…</p>}>
-        <AreaPage />
+        <BySlug page={AreaPage} />
       </Suspense>
     ),
   },
@@ -57,7 +64,9 @@ const router = createBrowserRouter([
   },
 ]);
 
-const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 5 * 60_000, retry: 1 } } });
+// A missing crag (404) or a bad request will not change on a retry: say so at once. Network and server errors retry once.
+const retry = (failures: number, error: Error) => !(error instanceof ApiError && error.status >= 400 && error.status < 500) && failures < 1;
+const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 5 * 60_000, retry } } });
 
 export default function App() {
   return (

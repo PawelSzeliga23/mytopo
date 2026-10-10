@@ -40,6 +40,11 @@ def downgrade() -> None:
     op.drop_column('crag', 'child_friendly')
     # ### end Alembic commands ###
     op.drop_constraint("ck_line_point_kind", "line_point", type_="check")
+    # Kinds added here (ogranicznik) do not exist below: they become plain points of the line.
+    op.execute(
+        "UPDATE line_point SET kind = 'przelot' "
+        "WHERE kind NOT IN ('start', 'ring', 'hak', 'ucho', 'stanowisko', 'przelot')"
+    )
     op.create_check_constraint(
         "ck_line_point_kind", "line_point",
         "kind IN ('start', 'ring', 'hak', 'ucho', 'stanowisko', 'przelot')",

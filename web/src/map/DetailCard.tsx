@@ -114,14 +114,15 @@ export function DetailCardBody({ selection, onZoom, onOpenCrag, onOpenArea, onSe
   return (
     <div className="flex flex-col gap-2">
       <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{KIND_LABEL[selection.type]}</p>
-      <h2 className="pr-6 font-display text-2xl font-extrabold leading-tight tracking-tight">
-        {name}
+      {/* The pencil sits beside the heading, not in it: the heading's name is the area's name alone. */}
+      <div className="flex items-baseline gap-2 pr-6">
+        <h2 className="font-display text-2xl font-extrabold leading-tight tracking-tight">{name}</h2>
         {editable && selection.type !== "crag" && (
-          <button type="button" aria-label="Edytuj obszar" onClick={() => setEditingArea(true)} className="ml-2 align-middle text-base text-muted-foreground hover:text-foreground">
+          <button type="button" aria-label="Edytuj obszar" onClick={() => setEditingArea(true)} className="text-base text-muted-foreground hover:text-foreground">
             ✎
           </button>
         )}
-      </h2>
+      </div>
       <div className="flex flex-wrap gap-1.5">
         {selection.type === "crag" ? (
           <Chip>{countLabel(selection.crag.route_count, DROGI)}</Chip>

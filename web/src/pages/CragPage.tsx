@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type MouseEvent } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -57,6 +57,8 @@ export default function CragPage() {
   }, [crag]);
 
   const routes = useMemo(() => new Map((crag?.routes ?? []).map((route) => [route.id, route])), [crag]);
+  // A deleted route (or one gone with a refetch) is no longer selected.
+  const selectedRoute = selectedRouteId !== null && routes.has(selectedRouteId) ? selectedRouteId : null;
   const wall =
     crag?.walls.find((candidate) => candidate.id === wallId) ??
     (routeFromLink !== null ? crag?.walls.find((candidate) => candidate.lines.some((line) => line.route_id === routeFromLink)) : undefined) ??
@@ -68,15 +70,17 @@ export default function CragPage() {
   // Named after the wall, or "Zdjęcie n"; a lone unnamed wall needs no caption.
   const wallCaption = wall && crag && (crag.walls.length > 1 || wall.name ? wallLabel(wall, crag.walls.indexOf(wall)) : null);
 
-  function backToMap() {
-    // Came from the map: go back, so the map restores its view from the URL. Opened from a link: show the map at this crag.
-    if (location.key !== "default") navigate(-1);
-    else navigate(crag ? `/${formatViewHash({ longitude: crag.lng, latitude: crag.lat, zoom: CRAG_ZOOM })}` : "/");
+  // Opened from a link (or in a new tab): the map at this crag. Came from the map: back, so it restores its view.
+  const mapHref = crag ? `/${formatViewHash({ longitude: crag.lng, latitude: crag.lat, zoom: CRAG_ZOOM })}` : "/";
+  function backToMap(event: MouseEvent) {
+    if (location.key === "default" || event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0) return;
+    event.preventDefault();
+    navigate(-1);
   }
 
   function chooseRow(row: RouteRow) {
     if (row.wallId !== null && row.wallId !== wall?.id) setWallId(row.wallId);
-    setSelectedRouteId((current) => (current === row.route.id ? null : row.route.id));
+    setSelectedRouteId(selectedRoute === row.route.id ? null : row.route.id);
   }
 
   function editRoute(route: RouteOut) {
@@ -91,9 +95,9 @@ export default function CragPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 pb-10 lg:px-6">
       <header className="flex items-center justify-between py-3">
-        <button type="button" onClick={backToMap} aria-label="Wróć do mapy">
+        <Link to={mapHref} onClick={backToMap} aria-label="Wróć do mapy">
           <Logo />
-        </button>
+        </Link>
         <div className="flex items-center gap-2">
           <UserMenu />
           <ThemeToggle />
@@ -107,9 +111,9 @@ export default function CragPage() {
           <div className="contents lg:sticky lg:top-4 lg:flex lg:flex-col lg:gap-3">
             <div>
               <nav className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                <button type="button" onClick={backToMap} className="uppercase hover:text-foreground">
+                <Link to={mapHref} onClick={backToMap} className="uppercase hover:text-foreground">
                   ← Mapa
-                </button>
+                </Link>
                 {crag.path.map((area) => (
                   <Fragment key={area.id}>
                     {" · "}
@@ -144,7 +148,7 @@ export default function CragPage() {
                   key={wall.id}
                   wall={wall}
                   routes={routes}
-                  selectedRouteId={selectedRouteId}
+                  selectedRouteId={selectedRoute}
                   hoveredRouteId={hoveredRouteId}
                   onSelectRoute={setSelectedRouteId}
                   onHoverRoute={setHoveredRouteId}
@@ -163,7 +167,7 @@ export default function CragPage() {
             <RouteList
               rows={rows}
               wallNames={wallNames}
-              selectedRouteId={selectedRouteId}
+              selectedRouteId={selectedRoute}
               hoveredRouteId={hoveredRouteId}
               onChoose={chooseRow}
               onHover={setHoveredRouteId}

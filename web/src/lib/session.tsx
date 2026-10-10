@@ -88,6 +88,8 @@ interface EditorMutationOptions<V, R> {
   invalidate?: QueryKey[];
   /** Success toast; false when the caller shows its own. */
   successToast?: string | false;
+  /** Error codes the caller shows itself (e.g. next to a field) instead of a toast. */
+  quietErrors?: string[];
 }
 
 /**
@@ -118,6 +120,7 @@ export function useEditorMutation<V, R>(fn: (variables: V) => Promise<R>, option
     onError: (error) => {
       // Conflicts are shown by the caller: a revert's list of fields, a topo save's "someone saved meanwhile" dialog.
       if (error instanceof ApiError && (error.code === "revert_conflict" || error.code === "version_conflict")) return;
+      if (error instanceof ApiError && error.code && options.quietErrors?.includes(error.code)) return;
       toast.error(error.message);
     },
   });

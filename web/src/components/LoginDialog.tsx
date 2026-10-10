@@ -66,6 +66,8 @@ function LoginForm({ onLogin, onDone }: Pick<Props, "onLogin" | "onDone">) {
         <DialogTitle className="font-display text-xl font-extrabold">Tryb edycji</DialogTitle>
         <DialogDescription>Zapamiętamy na tym urządzeniu przez rok.</DialogDescription>
       </DialogHeader>
+      {/* One shared password: the hidden user name lets password managers file it. */}
+      <input type="text" name="username" autoComplete="username" value="topo" readOnly hidden />
       <div className="grid gap-1.5">
         <Label htmlFor="login-password">Hasło</Label>
         <Input

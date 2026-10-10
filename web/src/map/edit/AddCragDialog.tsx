@@ -50,7 +50,7 @@ export function AddCragDialog({ point, regions, sectors, onClose }: Props) {
   const navigate = useNavigate();
   const [initial] = useState(() => defaultTarget(point, regions, sectors));
   const [draft, setDraft] = useState<NewCrag>({ name: "", target: initial.target, regionName: "" });
-  // A new region is created right before the crag; if the write is repeated after a re-login it must not be created twice.
+  // A new region is created right before the crag; a repeated write (after a re-login or an error) reuses it.
   const createdRegion = useRef<{ name: string; id: number } | null>(null);
   const regionParent = initial.region?.parent_id ?? null;
 
@@ -59,9 +59,13 @@ export function AddCragDialog({ point, regions, sectors, onClose }: Props) {
       let areaId = Number(crag.target);
       if (crag.target === NEW_REGION) {
         const name = crag.regionName.trim();
-        if (createdRegion.current?.name !== name) {
+        if (createdRegion.current === null) {
           const region = await api.createArea({ kind: "region", parent_id: regionParent!, name });
           createdRegion.current = { name, id: region.id };
+        } else if (createdRegion.current.name !== name) {
+          // The name was edited after a failed attempt: rename the region made then rather than leave it empty.
+          await api.patchArea(createdRegion.current.id, { name });
+          createdRegion.current = { ...createdRegion.current, name };
         }
         areaId = createdRegion.current.id;
       }

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
@@ -87,12 +87,16 @@ interface Props {
   onClose: () => void;
 }
 
-function RouteForm({ cragId, slug, route, onClose }: Props) {
+/** Closing from outside the form (Escape): the form hands over its own close, which asks first when something was typed. */
+type RegisterClose = (close: () => void) => void;
+
+function RouteForm({ cragId, slug, route, onClose, registerClose }: Props & { registerClose: RegisterClose }) {
   // Frozen when the panel opens: a background refetch must not make untouched fields look changed.
   const [original] = useState(() => toDraft(route));
   const [draft, setDraft] = useState(original);
   const [comment, setComment] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
   const patch = draftToPatch(original, draft);
   const changed = Object.keys(patch).length;
   const canSave = changed > 0 && draft.name.trim() !== "";
@@ -100,8 +104,10 @@ function RouteForm({ cragId, slug, route, onClose }: Props) {
 
   const save = useEditorMutation(
     (body: RoutePatch | RouteCreate) => (route ? api.patchRoute(route.id, body as RoutePatch) : api.createRoute(cragId, body as RouteCreate)),
-    { invalidate, onSuccess: onClose },
+    { invalidate, onSuccess: onClose, quietErrors: ["invalid_grade"] },
   );
+  const leave = () => (changed > 0 ? setConfirmLeave(true) : onClose());
+  useEffect(() => registerClose(leave));
   const remove = useEditorMutation(() => api.deleteRoute(route!.id, comment.trim() || undefined), { invalidate, onSuccess: onClose });
 
   const gradeError = save.error instanceof ApiError && save.error.status === 422 && save.error.code === "invalid_grade" ? save.error.message : null;
@@ -156,7 +162,7 @@ function RouteForm({ cragId, slug, route, onClose }: Props) {
           </Button>
         )}
         <div className="ml-auto flex gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="outline" onClick={leave}>
             Anuluj
           </Button>
           <Button type="submit" disabled={!canSave || save.isPending}>
@@ -174,6 +180,16 @@ function RouteForm({ cragId, slug, route, onClose }: Props) {
         onConfirm={() => remove.mutate(undefined, { onSettled: () => setConfirmDelete(false) })}
         onCancel={() => setConfirmDelete(false)}
       />
+      <ConfirmDialog
+        open={confirmLeave}
+        title="Porzucić zmiany?"
+        description="Wprowadzone zmiany nie zostały zapisane."
+        confirmLabel="Porzuć"
+        cancelLabel="Wróć do edycji"
+        destructive
+        onConfirm={onClose}
+        onCancel={() => setConfirmLeave(false)}
+      />
     </form>
   );
 }
@@ -186,10 +202,14 @@ export function RouteEditPanel(props: Props) {
   const isDesktop = useIsDesktop();
   const title = props.route ? props.route.name : "Nowa droga";
   const description = props.route ? "Edycja drogi" : "Dodawanie drogi do skały";
+  const closeRequest = useRef(props.onClose);
+  const registerClose = useCallback((close: () => void) => {
+    closeRequest.current = close;
+  }, []);
 
   if (isDesktop) {
     return (
-      <Sheet open modal={false} onOpenChange={(open) => !open && props.onClose()}>
+      <Sheet open modal={false} onOpenChange={(open) => !open && closeRequest.current()}>
         <SheetContent
           showOverlay={false}
           showCloseButton={false}
@@ -201,7 +221,7 @@ export function RouteEditPanel(props: Props) {
             <SheetTitle>{title}</SheetTitle>
             <SheetDescription>{description}</SheetDescription>
           </SheetHeader>
-          <RouteForm {...props} />
+          <RouteForm {...props} registerClose={registerClose} />
         </SheetContent>
       </Sheet>
     );
@@ -213,7 +233,7 @@ export function RouteEditPanel(props: Props) {
           <DrawerTitle>{title}</DrawerTitle>
           <DrawerDescription>{description}</DrawerDescription>
         </DrawerHeader>
-        <RouteForm {...props} />
+        <RouteForm {...props} registerClose={registerClose} />
       </DrawerContent>
     </Drawer>
   );

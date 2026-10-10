@@ -62,7 +62,7 @@ describe("ChangesPage", () => {
     renderPage();
     expect(await screen.findByTestId("change-entry")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Cofnij|Przywróć/ })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "✎ Edytuj" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edytuj" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Ostatnie zmiany" })).toBeInTheDocument();
   });
 

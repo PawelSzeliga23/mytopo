@@ -74,7 +74,7 @@ export default function MapPage() {
   const { isEditor, reauthenticating } = useSession();
   // While the login dialog is open after a 401 the session is empty, but the edit UI must stay as it is.
   const editable = isEditor || reauthenticating;
-  const [mode, setMode] = useState<MapMode>(BROWSE);
+  const [modeState, setMode] = useState<MapMode>(BROWSE);
   const [sectorDialog, setSectorDialog] = useState(false);
   // "Przesuń na mapie" on a crag page arrives as ?przesun=ID; it is read once and dropped from the address.
   const [pendingMove, setPendingMove] = useState(() => parseMoveParam(location.search));
@@ -101,6 +101,12 @@ export default function MapPage() {
     () => new globalThis.Map((crags?.features ?? []).map((feature) => [feature.properties.id, feature.geometry.coordinates as LngLat])),
     [crags],
   );
+  // A crag being moved that vanished from the map data (deleted meanwhile) ends the move: there is nothing to drag.
+  const movedCragGone = modeState.kind === "move" && cragCenters.size > 0 && !cragCenters.has(modeState.crag.id);
+  const mode = movedCragGone ? BROWSE : modeState;
+  useEffect(() => {
+    if (movedCragGone) toast.error("Tej skały już nie ma na mapie");
+  }, [movedCragGone]);
 
   const selected = mode.kind === "sector" ? mode.selected : null;
   const hull = useMemo(() => {
@@ -353,11 +359,13 @@ export default function MapPage() {
       {mode.kind === "move" && moveOrigin && (
         <MoveCragBar crag={mode.crag} origin={moveOrigin} target={mode.target} onCancel={leaveEdit} onSaved={leaveEdit} />
       )}
+      {/* One boundary per lazy part: a dialog loading for the first time must not hide the bar beside it. */}
+      <Suspense fallback={null}>{mode.kind === "add" && !mode.point && <AddCragBar onCancel={leaveEdit} />}</Suspense>
       <Suspense fallback={null}>
-      {mode.kind === "add" && !mode.point && <AddCragBar onCancel={leaveEdit} />}
-      {mode.kind === "add" && mode.point && (
-        <AddCragDialog point={mode.point} regions={[...index.regions.values()]} sectors={[...index.sectors.values()]} onClose={leaveEdit} />
-      )}
+        {mode.kind === "add" && mode.point && (
+          <AddCragDialog point={mode.point} regions={[...index.regions.values()]} sectors={[...index.sectors.values()]} onClose={leaveEdit} />
+        )}
+      </Suspense>
       {mode.kind === "sector" && (
         <NewSectorBar
           crags={mode.selected.length}
@@ -366,19 +374,20 @@ export default function MapPage() {
           onNext={() => setSectorDialog(true)}
         />
       )}
-      {mode.kind === "sector" && sectorDialog && (
-        <NewSectorDialog
-          region={mode.region}
-          crags={mode.selected.flatMap((id) => {
-            const crag = index.crags.get(id);
-            if (!crag) return [];
-            const fromSector = crag.area_kind === "sektor" ? (index.sectors.get(crag.area_id)?.name ?? null) : null;
-            return [{ id, name: crag.name, fromSector }];
-          })}
-          onBack={() => setSectorDialog(false)}
-          onCreated={leaveEdit}
-        />
-      )}
+      <Suspense fallback={null}>
+        {mode.kind === "sector" && sectorDialog && (
+          <NewSectorDialog
+            region={mode.region}
+            crags={mode.selected.flatMap((id) => {
+              const crag = index.crags.get(id);
+              if (!crag) return [];
+              const fromSector = crag.area_kind === "sektor" ? (index.sectors.get(crag.area_id)?.name ?? null) : null;
+              return [{ id, name: crag.name, fromSector }];
+            })}
+            onBack={() => setSectorDialog(false)}
+            onCreated={leaveEdit}
+          />
+        )}
       </Suspense>
       <DetailCard
         selection={mode.kind === "browse" ? selection : null}

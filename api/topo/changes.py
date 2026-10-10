@@ -74,6 +74,17 @@ def _latest_version(session: Session, model: type, obj_id: int, tx_id: int, *, i
     ).first()
 
 
+def shown_area(session: Session, field: str, value: Any) -> Any:
+    """An area reference as its newest name (also of an area deleted since); other values unchanged."""
+    if field not in AREA_FIELDS or not isinstance(value, int):
+        return value
+    version = version_class(Area)
+    name = session.scalars(
+        sa.select(version.name).where(version.id == value).order_by(version.transaction_id.desc()).limit(1)
+    ).first()
+    return name if name is not None else value
+
+
 def transaction_changes(session: Session, tx_id: int) -> list[ObjectChange]:
     changes: list[ObjectChange] = []
     for model in MODELS:

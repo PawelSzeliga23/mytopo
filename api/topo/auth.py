@@ -49,6 +49,8 @@ def clean_nick(raw: str) -> str:
 
 
 class LoginLimiter:
+    MAX_KEYS = 1000
+
     def __init__(self, limit: int = 5, window: float = 60.0):
         self.limit, self.window = limit, window
         self._hits: dict[str, deque[float]] = defaultdict(deque)
@@ -59,6 +61,9 @@ class LoginLimiter:
         while hits and now - hits[0] >= self.window:
             hits.popleft()
         hits.append(now)
+        if len(self._hits) > self.MAX_KEYS:  # forget addresses that stopped trying
+            for stale in [k for k, v in self._hits.items() if now - v[-1] >= self.window]:
+                del self._hits[stale]
         return len(hits) <= self.limit
 
     def clear(self) -> None:

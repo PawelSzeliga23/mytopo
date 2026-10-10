@@ -52,7 +52,7 @@ def test_grade_band(grade, band):
 
 @pytest.mark.parametrize(
     ("grade", "french"),
-    [("III", "3"), ("V", "5a"), ("VI.1+", "6b+"), ("VI.3", "7a"), ("VI.1+/2", "6b+/6c"), ("6a", None), (None, None)],
+    [("III", "3"), ("V", "5a"), ("VI.1+", "6b+"), ("VI.3", "7a"), ("VI.1+/2", "6b+/6c"), ("VI.2/1", None), ("6a", None), (None, None)],
 )
 def test_to_french(grade, french):
     assert to_french(grade) == french

@@ -79,5 +79,7 @@ def to_french(raw: str | None) -> str | None:
         return None
     if right is None:
         return french_left
+    if grade_sort(raw) is None:  # a range that goes down (VI.2/1) is as unreadable here as in grade_sort
+        return None
     french_right = _FRENCH.get(right)
     return f"{french_left}/{french_right}" if french_right else None

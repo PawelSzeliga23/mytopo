@@ -2,6 +2,7 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image
+import pytest
 from sqlalchemy import func, select
 from sqlalchemy_continuum import version_class
 
@@ -181,6 +182,18 @@ class FakeSegmenter:
         quarter = width // 4
         classes[:, :quarter], classes[:, quarter:2 * quarter], classes[:, 2 * quarter:3 * quarter] = SKY, VEGETATION, ROCK
         return classes
+
+
+def test_segmentation_error_marks_wall_failed(session, tmp_path):
+    walls, _ = _walls(session, tmp_path)
+
+    class BrokenSegmenter:
+        def predict(self, image):
+            raise RuntimeError("brak pamięci GPU")
+
+    with pytest.raises(RuntimeError):
+        process_wall(session, walls[0], tmp_path, FakeEstimator(), BrokenSegmenter())
+    assert (walls[0].depth_status, walls[0].vegetation_ratio) == ("failed", None)
 
 
 def test_vegetation_stats_counts_only_vegetation_over_the_rock():

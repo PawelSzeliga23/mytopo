@@ -149,7 +149,7 @@ export function selectedCragLayer(c: MapColors, ids: number[]): LayerProps {
     filter: e(["in", ["get", "id"], ["literal", ids]]),
     paint: {
       "circle-radius": e(["interpolate", ["linear"], ["zoom"], 9, 7, 15, 10]),
-      "circle-color": c.ink,
+      "circle-color": "rgba(0, 0, 0, 0)", // a ring around the pin, which stays visible
       "circle-stroke-color": c.brand,
       "circle-stroke-width": 3,
     },

@@ -24,7 +24,7 @@ test("logowanie → zmiana wyceny → historia → cofnięcie", async ({ page, r
   let reverted = false;
   try {
     await page.goto(`/skaly/${crag.properties.slug}`);
-    await page.getByRole("button", { name: "✎ Edytuj" }).click();
+    await page.getByRole("button", { name: "Edytuj", exact: true }).click();
     await page.getByLabel("Hasło").fill(password);
     await page.getByLabel(/Twój nick/).fill("e2e");
     await page.getByRole("button", { name: "Wejdź" }).click();

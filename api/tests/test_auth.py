@@ -49,6 +49,15 @@ def test_limiter_resets_after_window():
     assert limiter.hit("ip", now=100.0)
 
 
+def test_limiter_forgets_quiet_addresses(monkeypatch):
+    limiter = LoginLimiter(limit=2, window=60.0)
+    monkeypatch.setattr(LoginLimiter, "MAX_KEYS", 3)
+    for i in range(4):
+        limiter.hit(f"ip{i}", now=0.0)
+    limiter.hit("late", now=100.0)
+    assert set(limiter._hits) == {"late"}
+
+
 @pytest.mark.parametrize("nick", [" a ", "import:x", "x" * 41])
 def test_invalid_nick(client, edit_settings, nick):
     response = login(client, nick=nick)

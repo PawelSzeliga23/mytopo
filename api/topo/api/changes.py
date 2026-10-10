@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from topo.api.deps import current_editor
 from topo.api.errors import ApiError, raise_not_found
-from topo.changes import list_changes
+from topo.changes import list_changes, shown_area
 from topo.config import get_settings
 from topo.db import get_session
 from topo.history import IMPORT_AUTHOR_PREFIX, transaction_class
@@ -51,10 +51,14 @@ def revert_change(
             session, tx_id, nick, body.comment, body.mode or "check", Path(get_settings().media_root)
         )
     except RevertConflict as exc:
-        content = {
-            "code": "revert_conflict", "message": "Część pól zmieniono później",
-            "conflicts": [asdict(conflict) for conflict in exc.conflicts],
-        }  # fmt: skip
+        conflicts = [
+            asdict(conflict) | {
+                "current": shown_area(session, conflict.field, conflict.current),
+                "restored": shown_area(session, conflict.field, conflict.restored),
+            }
+            for conflict in exc.conflicts
+        ]  # fmt: skip
+        content = {"code": "revert_conflict", "message": "Część pól zmieniono później", "conflicts": conflicts}
         return JSONResponse(jsonable_encoder(content), status_code=409)
     except MissingParent as exc:
         content = {"code": "missing_parent", "message": exc.message, "transaction_id": exc.transaction_id}

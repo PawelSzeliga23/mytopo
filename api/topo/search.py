@@ -1,4 +1,4 @@
-"""Search by name for areas, crags, named walls and routes; case and Polish letters do not matter."""
+"""Search by name for areas, crags, walls (not those named like their crag) and routes; case and Polish letters do not matter."""
 
 from typing import Any, Literal
 
@@ -24,12 +24,13 @@ def _like(value: str) -> str:
 
 
 def _match(column: str) -> str:
-    return f"unaccent(lower({column})) LIKE unaccent(lower(:contains)) ESCAPE '\\'"
+    # search_key (migration 0009) = unaccent(lower(...)), with a trigram index on every searched name.
+    return f"search_key({column}) LIKE search_key(:contains) ESCAPE '\\'"
 
 
 def _order(column: str) -> str:
     """Names starting with the phrase first, then the rest; alphabetically within both."""
-    return f"(unaccent(lower({column})) LIKE unaccent(lower(:prefix)) ESCAPE '\\') DESC, {column}"
+    return f"(search_key({column}) LIKE search_key(:prefix) ESCAPE '\\') DESC, {column}"
 
 
 def _rows(session: Session, sql: str, params: dict[str, Any]) -> tuple[list[dict[str, Any]], int]:
@@ -97,7 +98,8 @@ def search(
             "walls",
             """SELECT x.id, x.name, c.name AS crag_name, c.slug AS crag_slug, count(*) OVER () AS total
                FROM wall x JOIN crag c ON c.id = x.crag_id
-               WHERE x.name IS NOT NULL AND {where} ORDER BY {order}""",
+               WHERE x.name IS NOT NULL AND search_key(x.name) <> search_key(c.name) AND {where}
+               ORDER BY {order}""",
             "x.name", "c.area_id",
         )
     if type_ in ("all", "routes"):

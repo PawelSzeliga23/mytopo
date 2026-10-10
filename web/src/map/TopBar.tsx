@@ -14,7 +14,7 @@ interface Props {
 
 export function TopBar({ areas, onPickArea, onPickCrag }: Props) {
   return (
-    <header className={`absolute inset-x-3 top-3 z-10 flex items-center gap-3 px-3 py-2 lg:right-auto lg:w-[600px] ${floating}`}>
+    <header className={`absolute inset-x-3 top-3 z-10 flex items-center gap-2 px-3 sm:gap-3 py-2 lg:right-auto lg:w-[600px] ${floating}`}>
       <Logo />
       <SearchBox areas={areas} onPickArea={onPickArea} onPickCrag={onPickCrag} />
       <UserMenu />

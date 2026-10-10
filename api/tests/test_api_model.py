@@ -122,6 +122,24 @@ def test_save_model_conflict(editor, session, media):
     assert (response.json()["code"], response.json()["current_model"]) == ("model_conflict", 1)
 
 
+def test_save_model_on_replaced_photo(editor, session, media):
+    _, wall = ready_wall(session, media)
+    old_photo = f"/media/walls/{wall.id}/0/display.webp"
+    response = save(editor, wall.id, base_photo=old_photo, depth=depth_png(), segments=segments_png())
+    assert (response.status_code, response.json()["code"]) == (409, "photo_changed")
+    current = f"/media/walls/{wall.id}/1/display.webp"
+    assert save(editor, wall.id, base_photo=current, depth=depth_png(), segments=segments_png()).status_code == 200
+
+
+def test_save_model_recomputes_vegetation(editor, session, media):
+    _, wall = ready_wall(session, media)
+    classes = np.full((SIZE[1], SIZE[0]), 3, dtype=np.uint8)
+    classes[10:15, :] = 1  # a band across the rock painted as vegetation
+    assert save(editor, wall.id, depth=depth_png(), segments=png(classes)).status_code == 200
+    session.expire_all()
+    assert session.get(Wall, wall.id).vegetation_ratio == pytest.approx(5 / 30)
+
+
 @pytest.mark.parametrize("files", [
     {"depth": depth_png(size=(20, 30)), "segments": segments_png()},
     {"depth": segments_png(), "segments": segments_png()},  # 8-bit depth

@@ -140,8 +140,10 @@ function ModelScene(props: ModelCanvasProps) {
   // A drag of a brush: dabs change the grid at once (redrawn once per frame), the drag ends as one undo step.
   const stroke = useRef<Stroke | null>(null);
   const frame = useRef(0);
+  // Fingers on the screen: a second one turns a brush drag into a pinch (zoom), so the stroke ends there.
+  const touches = useRef(0);
   const dab = (event: ThreeEvent<PointerEvent>) => {
-    if (!stroke.current || !event.uv || tool === "orbit") return;
+    if (!stroke.current || !event.uv || tool === "orbit" || touches.current > 1) return;
     stroke.current.apply(tool, Math.round(event.uv.x * grid.gx), Math.round((1 - event.uv.y) * grid.gy), brush);
     if (!frame.current) {
       frame.current = requestAnimationFrame(() => {
@@ -156,8 +158,23 @@ function ModelScene(props: ModelCanvasProps) {
     if (patch) onStroke(patch);
   };
   useEffect(() => {
-    window.addEventListener("pointerup", end);
-    return () => window.removeEventListener("pointerup", end);
+    const down = (event: PointerEvent) => {
+      if (event.pointerType !== "touch") return;
+      touches.current += 1;
+      if (touches.current > 1) end();
+    };
+    const up = (event: PointerEvent) => {
+      if (event.pointerType === "touch") touches.current = Math.max(0, touches.current - 1);
+      end();
+    };
+    window.addEventListener("pointerdown", down);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    return () => {
+      window.removeEventListener("pointerdown", down);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+    };
   });
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
@@ -169,7 +186,8 @@ function ModelScene(props: ModelCanvasProps) {
         geometry={pick}
         material={hidden}
         onPointerDown={(event) => {
-          if (tool === "orbit") return;
+          // touches counts the fingers already down (the window listener runs after this): only the first one paints.
+          if (tool === "orbit" || (event.nativeEvent.pointerType === "touch" && touches.current > 0)) return;
           event.stopPropagation();
           stroke.current = new Stroke(grid);
           dab(event);
@@ -179,7 +197,7 @@ function ModelScene(props: ModelCanvasProps) {
       {showRoutes && <RouteLines items={items} surface={surface} relief={relief} onChoose={() => {}} onHoverRoute={() => {}} />}
       <OrbitControls
         makeDefault
-        enabled={tool === "orbit"}
+        enableRotate={tool === "orbit"} // brushes keep the zoom (wheel, pinch)
         enablePan={false}
         enableDamping
         minAzimuthAngle={-Math.PI / 6}
@@ -193,7 +211,7 @@ function ModelScene(props: ModelCanvasProps) {
   );
 }
 
-/** The 2.5D model being edited: brushes paint on it, the orbit tool turns and zooms it. */
+/** The 2.5D model being edited: brushes paint on it, the orbit tool turns it; both zoom. */
 export function ModelCanvas(props: ModelCanvasProps) {
   return (
     <Canvas

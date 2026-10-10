@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { api, type AreaProps, type CragDetail, type CragPatch } from "@/lib/api";
+import { api, type AreaProps, type AreaRef, type CragDetail, type CragPatch } from "@/lib/api";
 import { useEditorMutation } from "@/lib/session";
 import { AreaSelect } from "@/map/edit/AreaSelect";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -21,17 +21,30 @@ interface Areas {
   sectors: AreaProps[];
 }
 
-function FieldInput({ field, draft, areas, onChange }: { field: CragField; draft: CragDraft; areas: Areas; onChange: (value: CragDraft[keyof CragDraft]) => void }) {
+interface FieldProps {
+  field: CragField;
+  draft: CragDraft;
+  areas: Areas;
+  /** The crag's area as it is now: listed even when it is not a region or sector (a crag directly in an obszar). */
+  currentArea?: AreaRef;
+  onChange: (value: CragDraft[keyof CragDraft]) => void;
+}
+
+function FieldInput({ field, draft, areas, currentArea, onChange }: FieldProps) {
   const id = `crag-${field.key}`;
   const value = draft[field.key];
   switch (field.kind) {
-    case "area":
+    case "area": {
+      const listed = [...areas.regions, ...areas.sectors].some((area) => String(area.id) === value);
       return (
         <div className="flex flex-col gap-1.5">
           <Label htmlFor={id}>{field.label}</Label>
-          <AreaSelect id={id} value={value as string} onChange={onChange} regions={areas.regions} sectors={areas.sectors} />
+          <AreaSelect id={id} value={value as string} onChange={onChange} regions={areas.regions} sectors={areas.sectors}>
+            {!listed && currentArea && String(currentArea.id) === value && <option value={value}>{currentArea.name}</option>}
+          </AreaSelect>
         </div>
       );
+    }
     case "aspects":
       return (
         <fieldset className="flex flex-wrap gap-1.5">
@@ -82,6 +95,7 @@ function FieldInput({ field, draft, areas, onChange }: { field: CragField; draft
             inputMode={field.kind === "number" ? "decimal" : undefined}
             step={field.kind === "number" ? "any" : undefined}
             value={value as string}
+            required={field.key === "name"}
             placeholder={field.hint}
             onChange={(event) => onChange(event.target.value)}
           />
@@ -140,7 +154,7 @@ export function CragEditForm({ crag, onDone }: Props) {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {CRAG_FIELDS.filter((field) => field.kind !== "area" || areas.regions.length > 0).map((field) => (
           <div key={field.key} className={field.wide ? "sm:col-span-2" : undefined}>
-            <FieldInput field={field} draft={draft} areas={areas} onChange={(value) => setDraft((current) => ({ ...current, [field.key]: value }))} />
+            <FieldInput field={field} draft={draft} areas={areas} currentArea={crag.path.at(-1)} onChange={(value) => setDraft((current) => ({ ...current, [field.key]: value }))} />
           </div>
         ))}
       </div>

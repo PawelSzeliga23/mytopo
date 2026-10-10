@@ -39,6 +39,8 @@ export function PhotoUploadDialog({ crag, wall, onClose }: Props) {
       // The editor reads the crag from the cache: it must already have the new photo.
       await client.invalidateQueries({ queryKey: ["crag", crag.slug] });
       onClose();
+      // Leaving the editor goes back to the crag page: there it should show this photo, not the first one.
+      navigate(`/skaly/${crag.slug}?sciana=${result.id}`, { replace: true });
       navigate(`/skaly/${crag.slug}/topo/${result.id}`);
     },
   });

@@ -35,8 +35,11 @@ export function UserMenu() {
           <UserDropdown nick={nick} onChangeNick={() => void requestLogin()} onLogout={() => void logout()} />
         </Suspense>
       ) : (
-        <Button variant="outline" size="sm" onClick={() => void requestLogin()}>
-          ✎ Edytuj
+        <Button variant="outline" size="sm" aria-label="Edytuj" onClick={() => void requestLogin()}>
+          <span aria-hidden>✎</span>
+          <span aria-hidden className="hidden sm:inline">
+            Edytuj
+          </span>
         </Button>
       )}
     </div>

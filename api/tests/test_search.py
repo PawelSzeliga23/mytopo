@@ -47,6 +47,12 @@ def test_diacritics_and_case_insensitive(client, data):
     assert (route["grade"], route["crag_name"], route["crag_slug"], route["length_m"]) == ("VI.1", "Żabi Koń", "zabi-kon", 20)
 
 
+def test_wall_named_like_its_crag_is_not_suggested(client, session, data):
+    f.wall(session, data["zabi"], "żabi kon")
+    session.commit()
+    assert names(search(client, q="zabi")["walls"]) == ["Żabia Ściana Wschodnia"]
+
+
 def test_prefix_matches_first(client, data):
     assert names(search(client, q="rysa")["routes"]) == ["Rysa Sokola", "Rysa Żabia", "100% rysa_x", "Lewa rysa", "Prawa rysa"]
 

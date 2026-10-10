@@ -63,14 +63,14 @@ describe("pasek użytkownika", () => {
     const user = userEvent.setup();
     wrap(<UserMenu />);
 
-    await user.click(await screen.findByRole("button", { name: "✎ Edytuj" }));
+    await user.click(await screen.findByRole("button", { name: "Edytuj" }));
     expect(screen.getByText("Tryb edycji")).toBeInTheDocument();
     await fillLogin(user);
     await user.click(screen.getByRole("button", { name: "Wejdź" }));
 
     expect(await screen.findByRole("button", { name: /ania/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Ostatnie zmiany" })).toHaveAttribute("href", "/zmiany");
-    expect(screen.queryByRole("button", { name: "✎ Edytuj" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edytuj" })).not.toBeInTheDocument();
     expect(localStorage.getItem("topo-nick")).toBe("ania");
   });
 
@@ -82,7 +82,7 @@ describe("pasek użytkownika", () => {
     const user = userEvent.setup();
     wrap(<UserMenu />);
 
-    await user.click(await screen.findByRole("button", { name: "✎ Edytuj" }));
+    await user.click(await screen.findByRole("button", { name: "Edytuj" }));
     await fillLogin(user);
     await user.click(screen.getByRole("button", { name: "Wejdź" }));
 
