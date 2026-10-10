@@ -21,3 +21,8 @@ Zbiorcza poprawka drobiazgów z sekcji „Wnioski z wykonania” planów 1–8 (
 - Wymagające urządzenia lub decyzji: gesty na prawdziwym telefonie, klawiatura ekranowa, strefa najechania na linię w Konvie.
 - Plan 9 (wdrożenie): obraz produkcyjny, nginx `client_max_body_size`, `--proxy-headers`, przebudowa obrazu `depth`.
 - Pusta zmiana w historii po potwierdzeniu niezmienionego położenia skały (zachowanie zgodne z decyzją z planu 6); `depth_model` po przywróceniu z dysku; luki w testach wymienione w dzienniku planu 6.
+
+## Do zrobienia — edytor 2.5D (od użytkownika, 2026-10-11)
+
+1. **Kolory hologramu na zdjęciu.** Prototyp (`depth_preview_view.html`, plan 5a) umiał nałożyć kolory skały i podłoża na zdjęcie; w edytorze 2.5D tego brakuje — dodać podgląd „zdjęcie + kolory hologramu”.
+2. **Pędzel „wygładź”.** „Spłaszcz” zostawia nierówności, a „Wygładź” działa dziś na cały model (przycisk). Potrzebny pędzel wygładzający tylko pod kursorem, jeden krok cofania na pociągnięcie, jak pozostałe pędzle.
