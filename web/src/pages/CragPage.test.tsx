@@ -120,6 +120,7 @@ describe("CragPage", () => {
     expect(screen.getByRole("button", { name: "Prawa ściana" })).toHaveAttribute("aria-pressed", "true");
   });
 
+it("?droga= z wyszukiwarki otwiera zdjęcie z tą drogą i ją zaznacza", async () => {    renderAt(crag, ["/skaly/brzuchata-turniczka?droga=4"]);    expect(await screen.findByTestId("viewer")).toHaveAttribute("data-wall", "21");    expect(screen.getByTestId("viewer")).toHaveAttribute("data-selected", "4");  });  it("?droga= drogi bez linii zaznacza ją na liście, zdjęcie pierwsze", async () => {    renderAt(crag, ["/skaly/brzuchata-turniczka?droga=5"]);    expect(await screen.findByTestId("viewer")).toHaveAttribute("data-wall", "20");    expect(screen.getByTestId("viewer")).toHaveAttribute("data-selected", "5");  });  it("?sciana= otwiera to zdjęcie", async () => {    renderAt(crag, ["/skaly/brzuchata-turniczka?sciana=21"]);    expect(await screen.findByTestId("viewer")).toHaveAttribute("data-wall", "21");  });
   it("miniatury przełączają zdjęcie", async () => {
     renderAt(crag);
     await userEvent.click(await screen.findByRole("button", { name: "Prawa ściana" }));

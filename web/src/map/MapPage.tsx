@@ -188,19 +188,29 @@ export default function MapPage() {
     const layer = feature.layer.id;
     if (layer === "region-points" || layer === "sector-fill") {
       const area = (layer === "region-points" ? index.regions : index.sectors).get(id);
-      if (area) {
-        setSelection({
-          type: area.kind === "sektor" ? "sektor" : "region",
-          area,
-          bands: bands.get(id) ?? [0, 0, 0, 0],
-          range: ranges.get(id) ?? null,
-          crags: cragLists.get(id) ?? [],
-        });
-      }
+      if (area) selectArea(area);
       return;
     }
     const crag = index.crags.get(id);
     if (crag) setSelection({ type: "crag", crag });
+  }
+
+  function selectArea(area: AreaProps) {
+    setSelection({
+      type: area.kind === "sektor" ? "sektor" : "region",
+      area,
+      bands: bands.get(area.id) ?? [0, 0, 0, 0],
+      range: ranges.get(area.id) ?? null,
+      crags: cragLists.get(area.id) ?? [],
+    });
+  }
+
+  // A region or sector picked in the search: framed on the map, with its card open.
+  function focusArea(id: number) {
+    const area = index.regions.get(id) ?? index.sectors.get(id);
+    if (!area) return;
+    zoomTo(area.bbox);
+    selectArea(area);
   }
 
   function zoomTo([minX, minY, maxX, maxY]: [number, number, number, number]) {
@@ -304,7 +314,16 @@ export default function MapPage() {
         {/* Bottom-left, so the base-layer switcher in the bottom-right corner never covers it. */}
         <AttributionControl position="bottom-left" compact />
       </Map>
-      {mode.kind === "browse" && <TopBar />}
+      {mode.kind === "browse" && (
+        <TopBar
+          areas={[...index.regions.values(), ...index.sectors.values()]}
+          onPickArea={focusArea}
+          onPickCrag={(id) => {
+            const crag = index.crags.get(id);
+            if (crag) selectCrag(crag);
+          }}
+        />
+      )}
       <LayerSwitcher
         value={base}
         onChange={(next) => {

@@ -7,7 +7,8 @@ interface Props {
   change: ChangeOut;
   /** The global list: names the crag and its path, and links to it. */
   showCrag?: boolean;
-  onRevert: (change: ChangeOut) => void;
+  /** Without it (not logged in) the entry has no undo button. */
+  onRevert?: (change: ChangeOut) => void;
 }
 
 function ObjectLines({ object }: { object: ObjectChangeOut }) {
@@ -68,9 +69,11 @@ export function ChangeEntry({ change, showCrag, onRevert }: Props) {
       {change.reverts_id !== null && <div className="ml-2.5 text-xs text-muted-foreground">cofnięcie zmiany #{change.reverts_id}</div>}
       <div className="mt-1 flex items-center gap-2">
         {change.reverted_by !== null && <span className="text-xs text-muted-foreground">cofnięta przez #{change.reverted_by}</span>}
-        <Button type="button" variant="outline" size="sm" onClick={() => onRevert(change)}>
-          {isRestore(change) ? "↶ Przywróć" : "↶ Cofnij"}
-        </Button>
+        {onRevert && (
+          <Button type="button" variant="outline" size="sm" onClick={() => onRevert(change)}>
+            {isRestore(change) ? "↶ Przywróć" : "↶ Cofnij"}
+          </Button>
+        )}
         {showCrag && change.crag?.slug && (
           <Button asChild variant="outline" size="sm">
             <Link to={`/skaly/${change.crag.slug}`}>Otwórz skałę</Link>

@@ -18,7 +18,7 @@ const FILTERS: { value: Filter; label: string; query: Pick<ChangesQuery, "kind" 
   { value: "deleted", label: "tylko usunięcia", query: { kind: "deleted" } },
 ];
 
-function ChangeList({ filter }: { filter: Filter }) {
+function ChangeList({ filter, canRevert }: { filter: Filter; canRevert: boolean }) {
   const { revert, dialog } = useRevert();
   const query = FILTERS.find((candidate) => candidate.value === filter)!.query;
   const { data, error, isPending, hasNextPage, isFetchingNextPage, fetchNextPage, refetch } = useInfiniteQuery({
@@ -48,7 +48,7 @@ function ChangeList({ filter }: { filter: Filter }) {
       {error && <p role="alert">{unauthorized ? "Zaloguj się, aby zobaczyć historię." : error.message}</p>}
       {data && items.length === 0 && <p className="text-muted-foreground">Brak zmian.</p>}
       {items.map((change) => (
-        <ChangeEntry key={change.id} change={change} showCrag onRevert={revert} />
+        <ChangeEntry key={change.id} change={change} showCrag onRevert={canRevert ? revert : undefined} />
       ))}
       {hasNextPage && (
         <div ref={sentinel} className="py-3">
@@ -84,28 +84,22 @@ export default function ChangesPage() {
           <ThemeToggle />
         </div>
       </header>
-      {isEditor || reauthenticating ? (
-        <>
-          <h1 className="font-display text-4xl font-extrabold tracking-tight">Ostatnie zmiany</h1>
-          <div role="group" aria-label="Filtr" className="my-3 flex flex-wrap gap-1.5">
-            {FILTERS.map((candidate) => (
-              <Button
-                key={candidate.value}
-                type="button"
-                size="sm"
-                variant={filter === candidate.value ? "default" : "outline"}
-                aria-pressed={filter === candidate.value}
-                onClick={() => setFilter(candidate.value)}
-              >
-                {candidate.label}
-              </Button>
-            ))}
-          </div>
-          <ChangeList filter={filter} />
-        </>
-      ) : (
-        <p className="text-muted-foreground">Ostatnie zmiany są widoczne po zalogowaniu. Użyj „✎ Edytuj” u góry.</p>
-      )}
+      <h1 className="font-display text-4xl font-extrabold tracking-tight">Ostatnie zmiany</h1>
+      <div role="group" aria-label="Filtr" className="my-3 flex flex-wrap gap-1.5">
+        {FILTERS.map((candidate) => (
+          <Button
+            key={candidate.value}
+            type="button"
+            size="sm"
+            variant={filter === candidate.value ? "default" : "outline"}
+            aria-pressed={filter === candidate.value}
+            onClick={() => setFilter(candidate.value)}
+          >
+            {candidate.label}
+          </Button>
+        ))}
+      </div>
+      <ChangeList filter={filter} canRevert={isEditor || reauthenticating} />
     </div>
   );
 }

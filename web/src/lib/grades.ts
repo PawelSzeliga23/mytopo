@@ -61,3 +61,9 @@ export function formatGradeRange(range: GradeRange | null): string | null {
   if (!range) return null;
   return range.min === range.max ? range.min : `${range.min} – ${range.max}`;
 }
+
+/** Grades offered by the search filter (Kraków scale, the usual range of Polish crags). */
+export const GRADE_CHOICES = [
+  "III", "IV", "IV+", "V-", "V", "V+", "VI-", "VI", "VI+", "VI.1", "VI.1+", "VI.2", "VI.2+", "VI.3", "VI.3+",
+  "VI.4", "VI.4+", "VI.5", "VI.5+", "VI.6", "VI.6+", "VI.7", "VI.7+", "VI.8",
+] as const;

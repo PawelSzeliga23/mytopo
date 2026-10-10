@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChangeOut, ObjectChangeOut } from "@/lib/api";
-import { changeHeadline, FIELD_LABELS, formatValue, formatWhen, objectTitle } from "./format";
+import { changeHeadline, FIELD_LABELS, formatValue, formatWhen, isRestore, objectTitle } from "./format";
 
 const object = (kind: ObjectChangeOut["kind"], op: ObjectChangeOut["op"], name: string | null = null, diffs: ObjectChangeOut["diffs"] = []): ObjectChangeOut => ({
   kind, id: 1, name, op, diffs, summary: null,
@@ -25,6 +25,12 @@ describe("format", () => {
     expect(formatValue("aspects", ["N", "E"])).toBe("N, E");
     expect(formatValue("grade", null)).toBe("—");
     expect(formatValue("description", "x".repeat(100))).toBe(`${"x".repeat(80)}…`);
+  });
+
+  it("„Przywróć”, gdy wpis usuwa i niczego nie tworzy (podbite wersje ścian nie przeszkadzają)", () => {
+    expect(isRestore(change([object("crag", "deleted"), object("wall", "deleted"), object("topo", "updated")]))).toBe(true);
+    expect(isRestore(change([object("route", "created"), object("route", "deleted")]))).toBe(false);
+    expect(isRestore(change([object("crag", "updated")]))).toBe(false);
   });
 
   it("formatuje pola modelu 2.5D", () => {

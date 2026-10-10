@@ -21,7 +21,8 @@ const SessionContext = createContext<Session | null>(null);
 
 async function fetchMe(): Promise<{ nick: string } | null> {
   try {
-    return await api.me();
+    const me = await api.me();
+    return me.nick ? { nick: me.nick } : null; // { nick: null } = not logged in
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) return null;
     throw error;

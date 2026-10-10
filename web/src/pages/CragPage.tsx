@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
@@ -39,8 +39,11 @@ export default function CragPage() {
     queryFn: () => api.crag(slug),
     refetchInterval: (query) => (query.state.data?.walls.some((w) => w.image_url && w.depth_status === "pending") ? DEPTH_POLL_MS : false),
   });
-  const [wallId, setWallId] = useState<number | null>(null);
-  const [selectedRouteId, setSelectedRouteId] = useState<number | null>(null);
+  // From the search: ?sciana=ID opens that photo, ?droga=ID selects the route (on the first photo with its line).
+  const [params] = useSearchParams();
+  const [wallId, setWallId] = useState<number | null>(() => Number(params.get("sciana")) || null);
+  const [routeFromLink] = useState<number | null>(() => Number(params.get("droga")) || null);
+  const [selectedRouteId, setSelectedRouteId] = useState<number | null>(routeFromLink);
   const [hoveredRouteId, setHoveredRouteId] = useState<number | null>(null);
   // The route panel: null = closed, { route: null } = a new route. It stays mounted while open, whatever the session does.
   const [panel, setPanel] = useState<{ route: RouteOut | null } | null>(null);
@@ -54,7 +57,11 @@ export default function CragPage() {
   }, [crag]);
 
   const routes = useMemo(() => new Map((crag?.routes ?? []).map((route) => [route.id, route])), [crag]);
-  const wall = crag?.walls.find((candidate) => candidate.id === wallId) ?? crag?.walls[0] ?? null;
+  const wall =
+    crag?.walls.find((candidate) => candidate.id === wallId) ??
+    (routeFromLink !== null ? crag?.walls.find((candidate) => candidate.lines.some((line) => line.route_id === routeFromLink)) : undefined) ??
+    crag?.walls[0] ??
+    null;
   const rows = useMemo(() => (crag ? routeRows(crag, wall?.id ?? null) : { onWall: [], other: [] }), [crag, wall]);
   const wallNames = useMemo(() => new Map((crag?.walls ?? []).map((candidate, index) => [candidate.id, wallLabel(candidate, index)])), [crag]);
 

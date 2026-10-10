@@ -26,7 +26,7 @@ function ConflictLine({ conflict }: { conflict: RevertConflict }) {
   return (
     <li>
       <b>{title}</b> · {fieldLabel(field)} — {who}: <ins className="diff-ins">{formatValue(field, conflict.current)}</ins>; cofnięcie ustawi{" "}
-      <del className="diff-del">{formatValue(field, conflict.current)}</del> → <ins className="diff-ins">{formatValue(field, conflict.restored)}</ins>
+      <ins className="diff-ins">{formatValue(field, conflict.restored)}</ins>
     </li>
   );
 }

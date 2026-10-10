@@ -84,6 +84,26 @@ export interface AreaDetail {
   bbox: [number, number, number, number] | null;
 }
 
+export type SearchType = "all" | "routes" | "crags";
+
+export interface SearchParams {
+  q: string;
+  type: SearchType;
+  grade_min?: string;
+  grade_max?: string;
+  /** Slug of a region or sector. */
+  area?: string;
+  offset?: number;
+}
+
+export interface SearchResult {
+  areas: { id: number; name: string; slug: string; kind: AreaKind; parent_name: string | null }[];
+  crags: { id: number; name: string; slug: string; area_name: string; route_count: number }[];
+  walls: { id: number; name: string; crag_name: string; crag_slug: string }[];
+  routes: { id: number; name: string; grade: string | null; grade_sort: number | null; length_m: number | null; crag_name: string; crag_slug: string }[];
+  totals: { areas: number; crags: number; walls: number; routes: number };
+}
+
 export interface AreaRef {
   id: number;
   name: string;
@@ -420,7 +440,8 @@ export const api = {
   crags: () => getJson<FeatureCollection<Point, CragProps>>("/api/map/crags"),
   crag: (slug: string) => getJson<CragDetail>(`/api/crags/${encodeURIComponent(slug)}`),
   area: (slug: string) => getJson<AreaDetail>(`/api/areas/${encodeURIComponent(slug)}`),
-  me: () => getJson<{ nick: string }>("/api/auth/me"),
+  me: () => getJson<{ nick: string | null }>("/api/auth/me"),
+  search: (params: SearchParams) => getJson<SearchResult>(`/api/search${queryString({ ...params })}`),
   login: (password: string, nick: string) => sendJson<{ nick: string }>("POST", "/api/auth/login", { password, nick }),
   logout: () => sendJson<void>("POST", "/api/auth/logout"),
   createCrag: (body: CragCreate) => sendJson<{ id: number; slug: string }>("POST", "/api/crags", body),

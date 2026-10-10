@@ -29,7 +29,7 @@ function stubFetch({ loggedIn = true, revertReply }: { loggedIn?: boolean; rever
   vi.stubGlobal(
     "fetch",
     vi.fn((url: string, init?: RequestInit) => {
-      if (url === "/api/auth/me") return Promise.resolve(loggedIn ? json({ nick: "ania" }) : json({ message: "Zaloguj się" }, 401));
+      if (url === "/api/auth/me") return Promise.resolve(json({ nick: loggedIn ? "ania" : null }));
       if (init?.method === "POST") {
         posts.push({ url, body: JSON.parse(String(init.body)) });
         return Promise.resolve(revertReply ? revertReply() : json({ transaction_id: 13 }));
@@ -57,12 +57,13 @@ function renderPage() {
 }
 
 describe("ChangesPage", () => {
-  it("niezalogowany widzi zaproszenie do logowania", async () => {
-    const { urls } = stubFetch({ loggedIn: false });
+  it("niezalogowany widzi zmiany, ale bez cofania", async () => {
+    stubFetch({ loggedIn: false });
     renderPage();
-    expect(await screen.findByText(/widoczne po zalogowaniu/)).toBeInTheDocument();
+    expect(await screen.findByTestId("change-entry")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Cofnij|Przywróć/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "✎ Edytuj" })).toBeInTheDocument();
-    expect(urls).toEqual([]);
+    expect(screen.getByRole("link", { name: "Ostatnie zmiany" })).toBeInTheDocument();
   });
 
   it("filtr „tylko usunięcia” prosi o kind=deleted", async () => {

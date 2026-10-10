@@ -124,5 +124,5 @@ export function formatWhen(iso: string, now: Date = new Date()): string {
   return `${date.getDate()} ${MONTHS[date.getMonth()]}`;
 }
 
-/** The transaction only deletes things: undoing it is a restore. */
-export const isRestore = (c: ChangeOut) => c.objects.length > 0 && c.objects.every((o) => o.op === "deleted");
+/** The transaction deletes things and creates nothing (version bumps of walls aside): undoing it is a restore. */
+export const isRestore = (c: ChangeOut) => c.objects.some((o) => o.op === "deleted") && !c.objects.some((o) => o.op === "created");
