@@ -163,3 +163,9 @@ def test_wall_3d_command(session, tmp_path, monkeypatch):
     result = CliRunner().invoke(app, ["wall-3d", str(wall.id), "auto"])
     assert wall.depth_enabled is None and "tylko 2D" in result.output
     assert CliRunner().invoke(app, ["wall-3d", str(wall.id), "maybe"]).exit_code != 0
+
+
+def test_depth_worker_rejects_unknown_model():
+    result = CliRunner().invoke(app, ["depth-worker", "--model", "huge"])
+    assert result.exit_code != 0
+    assert "large" in result.output

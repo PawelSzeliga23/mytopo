@@ -1,3 +1,5 @@
+import signal
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -17,6 +19,7 @@ from topo.depth import (
     wants_3d,
 )
 from topo.depth_preview import ready_walls, write_gallery
+from topo.depth_queue import work
 from topo.importer.fetch import CachedFetcher, FetchError
 from topo.importer.portalgorski.store import ImportReport
 from topo.importer.portalgorski.run import format_report, import_portalgorski
@@ -159,3 +162,26 @@ def wall_3d_command(
             raise typer.BadParameter("Nie ma takiej ściany")
         set_wall_fields(session, wall, depth_enabled=values[mode])
         typer.echo(f"Ściana #{wall.id}: {'2.5D' if wants_3d(wall) else 'tylko 2D'} (ustawienie: {mode}).")
+
+
+@app.command("depth-worker")
+def depth_worker_command(
+    model: str = typer.Option("large", "--model", help="large (GPU) albo small (CPU)"),
+    interval: float = typer.Option(5.0, "--interval", help="Co ile sekund sprawdzać pustą kolejkę"),
+) -> None:
+    """Liczy głębię i segmentację zdjęć wgranych w aplikacji, z kolejki (działa do Ctrl+C / SIGTERM)."""
+    if model not in MODELS:
+        raise typer.BadParameter(f"Nieznany model {model!r} — dostępne: {', '.join(MODELS)}")
+    stop = threading.Event()
+    signal.signal(signal.SIGTERM, lambda *_: stop.set())
+    estimator = HFDepthEstimator(model)
+    segmenter = HFSegmenter(estimator.device)
+    typer.echo(f"Worker głębi: {estimator.name} na {estimator.device}, czekam na zdjęcia…")
+    try:
+        work(
+            SessionLocal, Path(get_settings().media_root), estimator, segmenter,
+            interval=interval, should_stop=stop.is_set, sleep=stop.wait, log=typer.echo,
+        )
+    except KeyboardInterrupt:
+        pass
+    typer.echo("Worker głębi zatrzymany.")

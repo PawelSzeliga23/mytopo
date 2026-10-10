@@ -48,7 +48,15 @@ docker compose run --rm depth topo wall-3d 12 on           # 2.5D ręcznie (off 
 docker compose run --rm depth pytest -m slow                # test prawdziwego modelu (Small, CPU)
 ```
 
-Wynik: `media/walls/{id}/depth.png` (PNG 16-bit, dłuższy bok 768 px, jasne = bliżej) i `segments.png` (skała, podłoże, roślinność, niebo). Ściany, na których roślinność zasłania > 10% skały, nie mają 2.5D. W Git Bash argumenty `/data/…` poprzedź `MSYS_NO_PATHCONV=1`. Modele pobierają się do `./cache/huggingface/`.
+Wynik: `media/walls/{id}/depth.png` (dla zdjęć wgranych w aplikacji `walls/{id}/{n}/`, obok zdjęcia) (PNG 16-bit, dłuższy bok 768 px, jasne = bliżej) i `segments.png` (skała, podłoże, roślinność, niebo). Ściany, na których roślinność zasłania > 10% skały, nie mają 2.5D. W Git Bash argumenty `/data/…` poprzedź `MSYS_NO_PATHCONV=1`. Modele pobierają się do `./cache/huggingface/`.
+
+Zdjęcia wgrane w aplikacji (nowa ściana, podmiana zdjęcia) czekają w kolejce `depth_job`. Liczy je worker — działa w tle i sam pobiera kolejne zadania:
+
+```powershell
+docker compose --profile depth up -d depth-worker   # Large na GPU; logi: docker compose logs -f depth-worker
+```
+
+Na serwerze bez GPU: `topo depth-worker --model small` (CPU). Przerwane zadania wracają do kolejki przy następnym starcie workera; błąd widać na stronie skały („Ponów” po zalogowaniu).
 
 Galeria do oceny wyników (zdjęcie z liniami, głębia, cieniowanie, podgląd 2.5D):
 
