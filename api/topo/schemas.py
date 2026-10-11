@@ -71,6 +71,7 @@ class RouteOut(BaseModel):
     first_ascent: str | None
     year: int | None
     description: str | None
+    kind: Literal["sport", "trad"]
 
 
 class CragOut(BaseModel):
@@ -97,29 +98,37 @@ class CragOut(BaseModel):
     routes: list[RouteOut]
 
 
-class CragSummary(BaseModel):
-    id: int
-    name: str
-    slug: str
+class CragStats(BaseModel):
     route_count: int
     grade_bands: list[int]
     grade_min: str | None
     grade_min_sort: int | None
     grade_max: str | None
     grade_max_sort: int | None
+
+
+class CragSummary(CragStats):
+    id: int
+    name: str
+    slug: str
+    by_kind: dict[str, CragStats]
     sector_name: str | None = None
     lng: float | None = None
     lat: float | None = None
 
 
-class AreaChild(BaseModel):
+class AreaStats(BaseModel):
+    crag_count: int
+    route_count: int
+    grade_bands: list[int]
+
+
+class AreaChild(AreaStats):
     id: int
     name: str
     slug: str
     kind: str
-    crag_count: int
-    route_count: int
-    grade_bands: list[int]
+    by_kind: dict[str, AreaStats]
 
 
 class AreaOut(BaseModel):

@@ -6,6 +6,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 SearchType = Literal["all", "routes", "crags"]
+RouteKind = Literal["sport", "trad"]
 LIMITS = {"areas": 5, "crags": 8, "walls": 5, "routes": 20}
 MIN_QUERY = 2
 
@@ -49,6 +50,7 @@ def search(
     grade_max: int | None = None,
     area_id: int | None = None,
     offset: int = 0,
+    kind: RouteKind | None = None,
 ) -> dict[str, Any]:
     phrase = q.strip()
     has_text = len(phrase) >= MIN_QUERY
@@ -58,11 +60,22 @@ def search(
         return result
     params: dict[str, Any] = {
         "contains": f"%{_like(phrase)}%", "prefix": f"{_like(phrase)}%", "area": area_id,
-        "gmin": grade_min, "gmax": grade_max, "offset": offset,
+        "gmin": grade_min, "gmax": grade_max, "offset": offset, "kind": kind,
     }  # fmt: skip
     with_area = _SUBTREE if area_id is not None else ""
     in_area = "AND {column} IN (SELECT id FROM sub)" if area_id is not None else ""
     name_match = _match("{name}") if has_text else "TRUE"
+    # A route kind chosen: routes of that kind only, crags and areas with at least one of them (view route_kind).
+    is_kind = "EXISTS (SELECT 1 FROM route_kind rk WHERE rk.route_id = {route} AND rk.kind = :kind)"
+    counted_kind = f" AND {is_kind.format(route='r.id')}" if kind else ""
+    crag_kind = f" AND EXISTS (SELECT 1 FROM route r WHERE r.crag_id = x.id{counted_kind})" if kind else ""
+    # Areas are at most three levels deep: the area, its children, their children.
+    area_kind = (
+        " AND EXISTS (SELECT 1 FROM route r JOIN crag c ON c.id = r.crag_id WHERE (c.area_id = x.id OR c.area_id IN"
+        " (SELECT s.id FROM area s WHERE s.parent_id = x.id OR s.parent_id IN (SELECT id FROM area WHERE parent_id = x.id)))"
+        f" AND {is_kind.format(route='r.id')})"
+        if kind else ""
+    )  # fmt: skip
 
     def query(key: str, sql: str, name: str, area_column: str) -> None:
         where = name_match.format(name=name) + " " + in_area.format(column=area_column)
@@ -80,17 +93,17 @@ def search(
             "areas",
             """SELECT x.id, x.name, x.slug, x.kind, p.name AS parent_name, count(*) OVER () AS total
                FROM area x LEFT JOIN area p ON p.id = x.parent_id
-               WHERE {where} ORDER BY {order}""",
+               WHERE {where}""" + area_kind + """ ORDER BY {order}""",
             "x.name", "x.id",
         )
     if has_text and type_ in ("all", "crags"):
         query(
             "crags",
             """SELECT x.id, x.name, x.slug, a.name AS area_name,
-                      (SELECT count(*) FROM route r WHERE r.crag_id = x.id)::int AS route_count,
+                      (SELECT count(*) FROM route r WHERE r.crag_id = x.id""" + counted_kind + """)::int AS route_count,
                       count(*) OVER () AS total
                FROM crag x JOIN area a ON a.id = x.area_id
-               WHERE {where} ORDER BY {order}""",
+               WHERE {where}""" + crag_kind + """ ORDER BY {order}""",
             "x.name", "x.area_id",
         )
     if has_text and type_ == "all":
@@ -108,6 +121,8 @@ def search(
             grade += " AND x.grade_sort >= :gmin"
         if grade_max is not None:
             grade += " AND x.grade_sort <= :gmax"
+        if kind:
+            grade += " AND " + is_kind.format(route="x.id")
         query(
             "routes",
             """SELECT x.id, x.name, x.grade, x.grade_sort, x.length_m, c.name AS crag_name, c.slug AS crag_slug,

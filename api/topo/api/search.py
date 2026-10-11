@@ -8,7 +8,7 @@ from topo.api.errors import ApiError, raise_not_found
 from topo.db import get_session
 from topo.grades import grade_sort
 from topo.models import Area
-from topo.search import SearchType, search
+from topo.search import RouteKind, SearchType, search
 
 router = APIRouter(tags=["search"])
 
@@ -30,9 +30,10 @@ def get_search(
     grade_max: str | None = None,
     area: str | None = None,
     offset: Annotated[int, Query(ge=0, le=10_000)] = 0,
+    kind: RouteKind | None = None,
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
     area_id = None
     if area:
         area_id = session.scalar(select(Area.id).where(Area.slug == area)) or raise_not_found("obszar")
-    return search(session, q, type, _grade(grade_min), _grade(grade_max), area_id, offset)
+    return search(session, q, type, _grade(grade_min), _grade(grade_max), area_id, offset, kind)

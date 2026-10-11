@@ -17,6 +17,7 @@ from topo.editing import apply_fields, apply_grade, area_kind_ok, delete_crag, l
 from topo.grades import to_french
 from topo.models import Area, Crag, Route, RouteLine, Wall
 from topo.photos import read_upload, set_photo
+from topo.queries import route_kinds
 from topo.schemas import CragOut, LineOut, RouteOut, WallOut
 from topo.schemas_edit import CragCreate, CragPatch, DeleteBody, RouteCreate
 from topo.sectors import ToSectorPreview, crag_to_sector, to_sector_preview
@@ -59,7 +60,7 @@ def _wall_out(wall: Wall) -> WallOut:
     )
 
 
-def _route_out(route: Route) -> RouteOut:
+def _route_out(route: Route, kind: str) -> RouteOut:
     return RouteOut(
         id=route.id,
         number=route.number,
@@ -72,6 +73,7 @@ def _route_out(route: Route) -> RouteOut:
         first_ascent=route.first_ascent,
         year=route.year,
         description=route.description,
+        kind=kind,
     )
 
 
@@ -88,6 +90,7 @@ def get_crag(slug: str, session: Session = Depends(get_session)) -> CragOut:
     if crag is None:
         raise not_found("skała")
     point = to_shape(crag.location)
+    kinds = route_kinds(session, [route.id for route in crag.routes])
     return CragOut(
         id=crag.id,
         name=crag.name,
@@ -109,7 +112,7 @@ def get_crag(slug: str, session: Session = Depends(get_session)) -> CragOut:
         source_url=crag.source_url,
         needs_location=crag.needs_location,
         walls=[_wall_out(wall) for wall in crag.walls],
-        routes=[_route_out(route) for route in crag.routes],
+        routes=[_route_out(route, kinds[route.id]) for route in crag.routes],
     )
 
 

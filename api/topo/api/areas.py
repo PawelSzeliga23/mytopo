@@ -10,7 +10,7 @@ from topo.api.errors import ApiError, not_found, raise_not_found
 from topo.db import get_session, refresh_area_geom
 from topo.editing import apply_fields
 from topo.models import Area, Crag
-from topo.queries import area_grade_bands, crag_summaries
+from topo.queries import EMPTY_AREA_STATS, area_stats, crag_summaries
 from topo.schemas import AreaChild, AreaOut, CragSummary
 from topo.schemas_edit import AreaCreate, AreaPatch, DeleteBody
 from topo.sectors import make_sector
@@ -22,7 +22,7 @@ router = APIRouter(tags=["areas"])
 def _area_stats(session: Session, ids: list[int]) -> dict[int, dict[str, Any]]:
     rows = session.execute(
         text("""
-            SELECT area_id, crag_count, route_count,
+            SELECT area_id,
                    ST_X(center) AS lng, ST_Y(center) AS lat,
                    ST_XMin(hull) AS xmin, ST_YMin(hull) AS ymin,
                    ST_XMax(hull) AS xmax, ST_YMax(hull) AS ymax
@@ -33,8 +33,6 @@ def _area_stats(session: Session, ids: list[int]) -> dict[int, dict[str, Any]]:
     ).mappings()
     return {
         r["area_id"]: {
-            "crag_count": r["crag_count"],
-            "route_count": r["route_count"],
             "center": [r["lng"], r["lat"]],
             "bbox": [r["xmin"], r["ymin"], r["xmax"], r["ymax"]],
         }
@@ -49,7 +47,7 @@ def get_area(slug: str, session: Session = Depends(get_session)) -> AreaOut:
         raise not_found("obszar")
     stats = _area_stats(session, [area.id, *(child.id for child in area.children)])
     own = stats.get(area.id)
-    bands = area_grade_bands(session, [child.id for child in area.children])
+    counts = area_stats(session, [child.id for child in area.children])
     # The top level (e.g. the Jura) lists its regions only: its crags are thousands.
     crags = [] if area.kind == "obszar" else crag_summaries(session, area.id, with_sectors=True)
     return AreaOut(
@@ -65,9 +63,7 @@ def get_area(slug: str, session: Session = Depends(get_session)) -> AreaOut:
                 name=child.name,
                 slug=child.slug,
                 kind=child.kind,
-                crag_count=stats.get(child.id, {}).get("crag_count", 0),
-                route_count=stats.get(child.id, {}).get("route_count", 0),
-                grade_bands=bands.get(child.id, [0, 0, 0, 0]),
+                **counts.get(child.id, EMPTY_AREA_STATS),
             )
             for child in area.children
         ],
