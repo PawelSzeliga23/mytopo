@@ -11,3 +11,9 @@ Filtr działający w całej aplikacji, który odróżnia drogi tradowe od sporto
   - Mapa: liczba dróg, `GradeBar`, zakres wycen, ukrywanie skał bez dróg danego rodzaju.
   - Strona skały i obszaru: lista dróg, wygaszanie linii na topo 2D/2.5D.
   - Wyszukiwarka: filtr rodzaju obok wyceny.
+
+## Importer wspinanie.pl (odłożony 2026-10-11, przed wdrożeniem)
+
+- **Zakres (decyzja użytkownika):** tylko skały i drogi, których nie ma w Portalu Górskim — bez nadpisywania istniejących (zmiana względem pierwotnego specu, który zakładał samo uzupełnianie).
+- **Rozpoznanie strony:** `wspinanie.pl/topo/polska/{rejon}/{dolina}/{skala}.htm` (albo `.../index.htm`); statyczny HTML: opis, historia, dojazd, obrazek schematu, numerowana lista dróg `„Nazwa” WYCENA (5R+ST)`. **Brak współrzędnych**, brak autora i roku przy drogach. `robots.txt`: `Crawl-delay: 120` → kilkaset stron ≈ 15–30 h (na noc, z wznawianiem).
+- **Otwarte pytanie:** co z nowymi skałami bez współrzędnych — (A) środek dopasowanego regionu + `needs_location`, niedopasowane do raportu; (B) jak A, ale z tworzeniem brakujących regionów; (C) tylko brakujące drogi w istniejących skałach.
