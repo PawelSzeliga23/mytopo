@@ -13,14 +13,19 @@ interface Props {
   onPickCrag(id: number): void;
 }
 
+/** Phone: logo, filter and menu in the first row, the search in a full-width row below; from `md` up one row. */
 export function TopBar({ areas, onPickArea, onPickCrag }: Props) {
   return (
-    <header className={`absolute inset-x-3 top-3 z-10 flex items-center gap-2 px-3 sm:gap-3 py-2 lg:right-auto lg:w-[600px] ${floating}`}>
+    <header className={`absolute inset-x-3 top-3 z-10 flex flex-wrap items-center gap-2 px-3 py-2 sm:gap-3 md:flex-nowrap lg:right-auto lg:w-[820px] ${floating}`}>
       <Logo />
-      <SearchBox areas={areas} onPickArea={onPickArea} onPickCrag={onPickCrag} />
-      <RouteKindToggle />
-      <UserMenu />
-      <ThemeToggle />
+      <div className="order-last flex min-w-0 basis-full md:order-none md:flex-1 md:basis-auto">
+        <SearchBox areas={areas} onPickArea={onPickArea} onPickCrag={onPickCrag} />
+      </div>
+      <div className="ml-auto flex items-center gap-2 sm:gap-3 md:ml-0">
+        <RouteKindToggle />
+        <UserMenu />
+        <ThemeToggle />
+      </div>
     </header>
   );
 }

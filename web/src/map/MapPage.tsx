@@ -355,7 +355,7 @@ export default function MapPage() {
         }}
       />
       {error && (
-        <div role="alert" className="absolute inset-x-3 top-20 z-10 rounded-[10px] bg-destructive px-4 py-2 text-sm text-white lg:w-[520px]">
+        <div role="alert" className="absolute inset-x-3 top-28 z-10 rounded-[10px] bg-destructive md:top-20 px-4 py-2 text-sm text-white lg:w-[520px]">
           Nie udało się wczytać mapy: {error.message}
         </div>
       )}
