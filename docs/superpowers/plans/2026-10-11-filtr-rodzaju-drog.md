@@ -37,3 +37,11 @@ Spec: `docs/superpowers/specs/2026-10-11-filtr-rodzaju-drog-design.md`. Gałąź
 ## Zadanie 5: sprawdzenie
 
 - `pytest`, `vitest`, `tsc`; przeklikanie w przeglądarce (mapa, region, skała, wyszukiwarka, przełącznik po odświeżeniu).
+
+## Wnioski z wykonania (2026-10-11)
+
+- Wykonane inline na gałęzi `filtr-rodzaju-drog`: API (a8a9828), front (d8b18a9). `pytest` 359 ok, `vitest` 276 ok, `tsc` czysto; sprawdzone w przeglądarce (mapa, region, skała).
+- Odstępstwa od specu: w API płaskie pola zostały (= wszystkie drogi), wariant sport/trad w `by_kind`; wyszukiwarka filtruje po stronie serwera (`kind`), bo wyniki są stronicowane. Przełącznik na telefonie (pigułka) do `md`, nie `sm` — w pasku mapy zostaje miejsce na wyszukiwarkę.
+- Dodatkowo: mała mapa obszaru też chowa skały i sektory spoza filtra; karta na mapie zamyka się przy zmianie filtra.
+- Dane: 9 027 dróg sportowych, 2 881 tradowych — opis asekuracji nie dodał żadnej sportowej ponad punkty na topo.
+- Do decyzji po teście: siła wygaszenia na topo (krycie 0,3, szary) — na jasnym zdjęciu linie są ledwo widoczne; `/api/map/*` ok. 0,35 s.
