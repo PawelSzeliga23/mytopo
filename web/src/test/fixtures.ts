@@ -24,7 +24,7 @@ export function makeWall(id: number, lines: LineOut[], extra: Partial<WallOut> =
 export function makeRoute(id: number, name: string, extra: Partial<RouteOut> = {}): RouteOut {
   return {
     id, number: id, name, grade: "VI.1", grade_fr: "6b", grade_sort: 120, length_m: null, protection: null,
-    first_ascent: null, year: null, description: null, ...extra,
+    first_ascent: null, year: null, description: null, kind: "sport", ...extra,
   };
 }
 

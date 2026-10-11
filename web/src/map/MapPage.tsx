@@ -7,6 +7,7 @@ import { formatViewHash, parseViewHash } from "@/map/view";
 import { Button } from "@/components/ui/button";
 import { aggregateBands, aggregateRanges, cragsByArea } from "@/lib/aggregate";
 import type { AreaProps, CragProps } from "@/lib/api";
+import { collectionOfKind, useRouteKind } from "@/lib/routeKind";
 import { useSession } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
 import { DetailCard } from "@/map/DetailCard";
@@ -70,7 +71,8 @@ export default function MapPage() {
   const [base, setBase] = useState<BaseLayer>(readBase);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [cursor, setCursor] = useState("");
-  const { regions, sectors, crags, error } = useMapData();
+  const data = useMapData();
+  const { kind: chosenKind } = useRouteKind();
   const { isEditor, reauthenticating } = useSession();
   // While the login dialog is open after a 401 the session is empty, but the edit UI must stay as it is.
   const editable = isEditor || reauthenticating;
@@ -78,6 +80,18 @@ export default function MapPage() {
   const [sectorDialog, setSectorDialog] = useState(false);
   // "Przesuń na mapie" on a crag page arrives as ?przesun=ID; it is read once and dropped from the address.
   const [pendingMove, setPendingMove] = useState(() => parseMoveParam(location.search));
+  // The sport / trad filter hides crags and areas without such routes; editing the map (or a move about to start) shows everything.
+  const kind = modeState.kind === "browse" && pendingMove === null ? chosenKind : "all";
+  const regions = useMemo(() => collectionOfKind(data.regions, kind), [data.regions, kind]);
+  const sectors = useMemo(() => collectionOfKind(data.sectors, kind), [data.sectors, kind]);
+  const crags = useMemo(() => collectionOfKind(data.crags, kind), [data.crags, kind]);
+  const { error } = data;
+  // A card opened under another filter shows other numbers (or a hidden crag): close it when the filter changes.
+  const [selectionKind, setSelectionKind] = useState(kind);
+  if (selectionKind !== kind) {
+    setSelectionKind(kind);
+    setSelection(null);
+  }
 
   const style = useMemo(() => buildBaseStyle(base, theme === "dark"), [base, theme]);
   const colors = MAP_COLORS[theme];

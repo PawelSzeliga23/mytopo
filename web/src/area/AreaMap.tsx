@@ -3,6 +3,7 @@ import type { FeatureCollection, Point } from "geojson";
 import { useMemo, useState } from "react";
 import Map, { Layer, Source, type MapLayerMouseEvent } from "react-map-gl/maplibre";
 import { api, type AreaDetail } from "@/lib/api";
+import { collectionOfKind, itemsOfKind, useRouteKind } from "@/lib/routeKind";
 import { useTheme } from "@/lib/theme";
 import { MAP_COLORS } from "@/map/layers";
 import { buildBaseStyle } from "@/map/style";
@@ -13,25 +14,25 @@ const FONT = ["Noto Sans Bold"];
 export default function AreaMap({ area, onOpenCrag }: { area: AreaDetail; onOpenCrag: (slug: string) => void }) {
   const { theme } = useTheme();
   const colors = MAP_COLORS[theme];
+  const { kind } = useRouteKind();
   const style = useMemo(() => buildBaseStyle("osm", theme === "dark"), [theme]);
   const hulls = useQuery({ queryKey: ["map", "sectors"], queryFn: api.sectorHulls });
   const [cursor, setCursor] = useState("");
   const sectors = useMemo(
-    () =>
-      hulls.data && {
-        ...hulls.data,
-        features: hulls.data.features.filter((feature) => feature.properties.id === area.id || feature.properties.parent_id === area.id),
-      },
-    [hulls.data, area.id],
+    () => {
+      const shown = collectionOfKind(hulls.data, kind);
+      return shown && { ...shown, features: shown.features.filter((feature) => feature.properties.id === area.id || feature.properties.parent_id === area.id) };
+    },
+    [hulls.data, area.id, kind],
   );
   const crags = useMemo<FeatureCollection<Point, { slug: string; name: string }>>(
     () => ({
       type: "FeatureCollection",
-      features: area.crags
+      features: itemsOfKind(area.crags, kind)
         .filter((crag) => crag.lng !== null && crag.lat !== null)
         .map((crag) => ({ type: "Feature", geometry: { type: "Point", coordinates: [crag.lng!, crag.lat!] }, properties: { slug: crag.slug, name: crag.name } })),
     }),
-    [area.crags],
+    [area.crags, kind],
   );
   if (!area.bbox) return null;
   const [minX, minY, maxX, maxY] = area.bbox;

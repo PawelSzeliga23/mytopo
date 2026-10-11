@@ -3,6 +3,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { BackAndMap } from "@/components/BackAndMap";
 import { Logo } from "@/components/Logo";
+import { RouteKindToggle } from "@/components/RouteKindToggle";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
 import { Button } from "@/components/ui/button";
@@ -93,6 +94,7 @@ export default function CragPage() {
           <Logo />
         </Link>
         <div className="flex items-center gap-2">
+          <RouteKindToggle />
           <UserMenu />
           <ThemeToggle />
         </div>

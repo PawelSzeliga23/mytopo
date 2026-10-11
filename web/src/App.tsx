@@ -3,6 +3,7 @@ import { lazy, Suspense, type ComponentType } from "react";
 import { createBrowserRouter, RouterProvider, useParams } from "react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { ApiError } from "@/lib/api";
+import { RouteKindProvider } from "@/lib/routeKind";
 import { SessionProvider } from "@/lib/session";
 import { ThemeProvider } from "@/lib/theme";
 import MapPage from "@/map/MapPage";
@@ -73,7 +74,9 @@ export default function App() {
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <SessionProvider>
-          <RouterProvider router={router} />
+          <RouteKindProvider>
+            <RouterProvider router={router} />
+          </RouteKindProvider>
           <Toaster />
         </SessionProvider>
       </QueryClientProvider>

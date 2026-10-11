@@ -3,6 +3,7 @@ import { Canvas, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { buildScene, type SceneLine } from "@/crag/scene";
+import { useRouteKind } from "@/lib/routeKind";
 import {
   buildSurface,
   decodeClasses,
@@ -33,8 +34,8 @@ export interface Wall3DProps {
   onFail: () => void;
 }
 
-const WIDTH = { normal: 3, dim: 2.5, hover: 5, selected: 6 } as const;
-const OPACITY = { normal: 1, dim: 0.35, hover: 1, selected: 1 } as const;
+const WIDTH = { normal: 3, dim: 2.5, muted: 2.5, hover: 5, selected: 6 } as const;
+const OPACITY = { normal: 1, dim: 0.35, muted: 0.3, hover: 1, selected: 1 } as const;
 /** buildScene works in pixels; a 1000×1000 "photo" gives coordinates that divide back to 0–1. */
 const UNIT = 1000;
 /** A click that moved the pointer further than this (px) was a rotation, not a choice. */
@@ -235,16 +236,17 @@ export default function Wall3D({ wall, routes, selectedRouteId, hoveredRouteId, 
   const surface = useSurface(wall, onFail);
   const photo = usePhoto(wall.image_url, look === "photo");
   const hologram = useMemo(() => createHologramMaterial(wall.rock_color, wall.ground_color), [wall.rock_color, wall.ground_color]);
+  const { kind } = useRouteKind();
   const photoMaterial = useMemo(() => (photo ? createPhotoMaterial(photo) : null), [photo]);
   useEffect(() => () => hologram.dispose(), [hologram]);
   useEffect(() => () => photoMaterial?.dispose(), [photoMaterial]);
   const items = useMemo(
     () =>
       buildScene({
-        wall, routes, theme, selectedRouteId, hoveredRouteId,
+        wall, routes, theme, selectedRouteId, hoveredRouteId, kind,
         image: { width: UNIT, height: UNIT }, container: { width: UNIT, height: UNIT }, view: IDENTITY,
       }),
-    [wall, routes, theme, selectedRouteId, hoveredRouteId],
+    [wall, routes, theme, selectedRouteId, hoveredRouteId, kind],
   );
   const down = useRef<{ x: number; y: number } | null>(null);
 

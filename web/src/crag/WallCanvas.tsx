@@ -2,6 +2,7 @@ import type Konva from "konva";
 import { useRef, useState } from "react";
 import { Circle, Group, Image as KonvaImage, Layer, Line, Rect, RegularPolygon, Stage, Text } from "react-konva";
 import { buildScene, type SceneLine, type SceneMark } from "@/crag/scene";
+import { useRouteKind } from "@/lib/routeKind";
 import { draggedAfterStart, isDrag } from "@/crag/gesture";
 import { clampView, IDENTITY, panBy, toScreen, zoomAt, type Point, type Size, type View } from "@/crag/view";
 import type { RouteOut, WallOut } from "@/lib/api";
@@ -18,8 +19,8 @@ interface WallCanvasProps {
   onHoverRoute: (routeId: number | null) => void;
 }
 
-const WIDTH = { normal: 3, dim: 2.5, hover: 5, selected: 6 } as const;
-const OPACITY = { normal: 1, dim: 0.35, hover: 1, selected: 1 } as const;
+const WIDTH = { normal: 3, dim: 2.5, muted: 2.5, hover: 5, selected: 6 } as const;
+const OPACITY = { normal: 1, dim: 0.35, muted: 0.3, hover: 1, selected: 1 } as const;
 const HALO = "rgba(0,0,0,0.45)";
 const WHEEL_STEP = 1.2;
 
@@ -55,7 +56,8 @@ export function WallCanvas({ image, wall, routes, size, selectedRouteId, hovered
   const dragged = useRef(false);
 
   const imageSize = { width: image.naturalWidth || wall.image_width || 1, height: image.naturalHeight || wall.image_height || 1 };
-  const scene = buildScene({ wall, routes, image: imageSize, container: size, view, theme, selectedRouteId, hoveredRouteId });
+  const { kind } = useRouteKind();
+  const scene = buildScene({ wall, routes, image: imageSize, container: size, view, theme, selectedRouteId, hoveredRouteId, kind });
   const topLeft = toScreen({ x: 0, y: 0 }, imageSize, size, view);
   const bottomRight = toScreen({ x: 1, y: 1 }, imageSize, size, view);
 

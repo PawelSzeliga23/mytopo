@@ -17,6 +17,24 @@ export class ApiError extends Error {
 
 export type AreaKind = "obszar" | "region" | "sektor";
 
+/** Sport: bolts on the topo or in the protection text; trad: everything else (view route_kind in the API). */
+export type RouteKind = "sport" | "trad";
+
+export interface AreaStats {
+  crag_count: number;
+  route_count: number;
+  grade_bands: number[];
+}
+
+export interface CragStats {
+  route_count: number;
+  grade_bands: number[];
+  grade_min: string | null;
+  grade_min_sort: number | null;
+  grade_max: string | null;
+  grade_max_sort: number | null;
+}
+
 export interface AreaProps {
   id: number;
   name: string;
@@ -25,6 +43,8 @@ export interface AreaProps {
   parent_id: number | null;
   crag_count: number;
   route_count: number;
+  /** The same counts for sport and trad routes alone. */
+  by_kind?: Record<RouteKind, AreaStats>;
   center: [number, number];
   bbox: [number, number, number, number];
 }
@@ -43,6 +63,7 @@ export interface CragProps {
   grade_max: string | null;
   grade_max_sort: number | null;
   needs_location: boolean;
+  by_kind?: Record<RouteKind, CragStats>;
 }
 
 /** A crag on an area page (`GET /api/areas/{slug}`), with the sector it lies in when listed on a region page. */
@@ -57,6 +78,7 @@ export interface AreaCrag {
   grade_max: string | null;
   grade_max_sort: number | null;
   sector_name: string | null;
+  by_kind?: Record<RouteKind, CragStats>;
   lng: number | null;
   lat: number | null;
 }
@@ -69,6 +91,7 @@ export interface AreaChildOut {
   crag_count: number;
   route_count: number;
   grade_bands: number[];
+  by_kind?: Record<RouteKind, AreaStats>;
 }
 
 export interface AreaDetail {
@@ -94,6 +117,7 @@ export interface SearchParams {
   /** Slug of a region or sector. */
   area?: string;
   offset?: number;
+  kind?: RouteKind;
 }
 
 export interface SearchResult {
@@ -176,6 +200,7 @@ export interface RouteOut {
   first_ascent: string | null;
   year: number | null;
   description: string | null;
+  kind: RouteKind;
 }
 
 export interface CragDetail {

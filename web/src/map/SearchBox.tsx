@@ -5,6 +5,7 @@ import { GradeBadge } from "@/components/GradeBadge";
 import { api, type AreaProps, type SearchParams, type SearchResult, type SearchType } from "@/lib/api";
 import { bandColor, GRADE_CHOICES } from "@/lib/grades";
 import { countLabel, DROGI } from "@/lib/plural";
+import { useRouteKind } from "@/lib/routeKind";
 import { useTheme } from "@/lib/theme";
 import { useDebounced } from "@/lib/useDebounced";
 import { cn } from "@/lib/utils";
@@ -44,11 +45,12 @@ export function SearchBox({ areas, onPickArea, onPickCrag }: Props) {
   const [gradeMin, setGradeMin] = useState("");
   const [gradeMax, setGradeMax] = useState("");
   const [area, setArea] = useState("");
+  const { kind } = useRouteKind();
   // The highlighted suggestion belongs to one result list: a new list starts at its first entry (Enter opens it).
   const [cursor, setCursor] = useState<{ list: unknown; index: number }>({ list: null, index: 0 });
 
   const params = useDebounced<SearchParams>(
-    { q: q.trim(), type, grade_min: gradeMin || undefined, grade_max: gradeMax || undefined, area: area || undefined },
+    { q: q.trim(), type, grade_min: gradeMin || undefined, grade_max: gradeMax || undefined, area: area || undefined, kind: kind === "all" ? undefined : kind },
     DEBOUNCE_MS,
   );
   const enabled = params.q.length >= MIN_QUERY || !!params.grade_min || !!params.grade_max || !!params.area;

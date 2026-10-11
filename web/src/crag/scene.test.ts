@@ -75,3 +75,25 @@ describe("kolejność rysowania (nakładające się linie)", () => {
     expect(scene.at(-1)!.layer).toBeGreaterThan(Math.max(...scene.slice(0, -1).map((line) => line.layer)));
   });
 });
+
+describe("filtr rodzaju dróg", () => {
+  const mixed = new Map([...routes].map(([id, route]) => [id, { ...route, kind: id === 2 ? ("trad" as const) : ("sport" as const) }]));
+
+  it("drogi innego rodzaju szare, przygaszone i na spodzie; linia bez drogi bez zmian", () => {
+    const scene = buildScene({ ...base, routes: mixed, selectedRouteId: null, hoveredRouteId: null, kind: "sport" });
+    expect(scene[0]).toMatchObject({ lineId: 2, emphasis: "muted", color: "#9ca3af" });
+    expect(scene[0].label).toMatchObject({ fill: "#9ca3af", textColor: "#ffffff" });
+    expect(scene.filter((line) => line.lineId !== 2).every((line) => line.emphasis === "normal")).toBe(true);
+  });
+
+  it("zaznaczona albo wskazana droga innego rodzaju rysowana normalnie", () => {
+    const scene = buildScene({ ...base, routes: mixed, selectedRouteId: 2, hoveredRouteId: null, kind: "sport" });
+    expect(scene.find((line) => line.lineId === 2)).toMatchObject({ emphasis: "selected", color: BAND_COLORS.light[2] });
+    expect(buildScene({ ...base, routes: mixed, selectedRouteId: null, hoveredRouteId: 2, kind: "sport" }).find((line) => line.lineId === 2)?.emphasis).toBe("hover");
+  });
+
+  it("bez filtra nic nie jest wygaszone", () => {
+    const scene = buildScene({ ...base, routes: mixed, selectedRouteId: null, hoveredRouteId: null, kind: "all" });
+    expect(scene.some((line) => line.emphasis === "muted")).toBe(false);
+  });
+});

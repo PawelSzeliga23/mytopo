@@ -27,7 +27,7 @@ const crag: CragProps = {
 };
 const route = (id: number, number: number, name: string): RouteOut => ({
   id, number, name, grade: "VI.1", grade_fr: "6b", grade_sort: 120, length_m: null, protection: null,
-  first_ascent: null, year: null, description: null,
+  first_ascent: null, year: null, description: null, kind: "sport",
 });
 
 function stubCrag(routes: RouteOut[]) {

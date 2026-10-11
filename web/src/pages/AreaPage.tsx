@@ -5,11 +5,13 @@ import { Chip } from "@/components/Chip";
 import { GradeBar } from "@/components/GradeBar";
 import { BackAndMap } from "@/components/BackAndMap";
 import { Logo } from "@/components/Logo";
+import { RouteKindToggle } from "@/components/RouteKindToggle";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
 import { sortCrags, type CragSort } from "@/area/sort";
 import { api, ApiError, type AreaDetail } from "@/lib/api";
 import { countLabel, DROGI, REGIONY, SEKTORY, SKALY } from "@/lib/plural";
+import { itemsOfKind, useRouteKind } from "@/lib/routeKind";
 import { formatViewHash } from "@/map/view";
 
 const AreaMap = lazy(() => import("@/area/AreaMap"));
@@ -37,7 +39,10 @@ export default function AreaPage() {
   const navigate = useNavigate();
   const { data: area, error, isPending } = useQuery({ queryKey: ["area", slug], queryFn: () => api.area(slug) });
   const [sort, setSort] = useState<Sort>("name");
-  const crags = useMemo(() => sortCrags(area?.crags ?? [], sort), [area, sort]);
+  // The sport / trad filter: statistics of that kind only, areas and crags without such routes hidden.
+  const { kind } = useRouteKind();
+  const children = useMemo(() => itemsOfKind(area?.children ?? [], kind), [area, kind]);
+  const crags = useMemo(() => sortCrags(itemsOfKind(area?.crags ?? [], kind), sort), [area, sort, kind]);
 
   useEffect(() => {
     if (!area) return;
@@ -54,6 +59,7 @@ export default function AreaPage() {
           <Logo />
         </Link>
         <div className="flex items-center gap-2">
+          <RouteKindToggle />
           <UserMenu />
           <ThemeToggle />
         </div>
@@ -79,13 +85,13 @@ export default function AreaPage() {
               <h1 className="font-display text-4xl font-extrabold tracking-tight">{area.name}</h1>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {area.children.length > 0 && (
-                <Chip>{area.kind === "obszar" ? countLabel(area.children.length, REGIONY) : countLabel(area.children.length, SEKTORY)}</Chip>
+              {children.length > 0 && (
+                <Chip>{area.kind === "obszar" ? countLabel(children.length, REGIONY) : countLabel(children.length, SEKTORY)}</Chip>
               )}
-              <Chip>{countLabel(area.kind === "obszar" ? area.children.reduce((sum, child) => sum + child.crag_count, 0) : area.crags.length, SKALY)}</Chip>
+              <Chip>{countLabel(area.kind === "obszar" ? children.reduce((sum, child) => sum + child.crag_count, 0) : crags.length, SKALY)}</Chip>
               <Chip>
                 {countLabel(
-                  area.kind === "obszar" ? area.children.reduce((sum, child) => sum + child.route_count, 0) : area.crags.reduce((sum, crag) => sum + crag.route_count, 0),
+                  area.kind === "obszar" ? children.reduce((sum, child) => sum + child.route_count, 0) : crags.reduce((sum, crag) => sum + crag.route_count, 0),
                   DROGI,
                 )}
               </Chip>
@@ -103,10 +109,10 @@ export default function AreaPage() {
             )}
           </div>
           <div className="flex flex-col gap-4">
-            {area.children.length > 0 && (
+            {children.length > 0 && (
               <Section title={area.kind === "obszar" ? "Regiony" : "Sektory"}>
                 <ul className="flex flex-col gap-1.5">
-                  {area.children.map((child) => (
+                  {children.map((child) => (
                     <li key={child.id}>
                       <Link to={`/obszary/${child.slug}`} className="flex items-center gap-3 rounded-lg bg-secondary px-3 py-2 hover:bg-secondary/70">
                         <span className="font-display font-semibold">{child.name}</span>
@@ -144,7 +150,7 @@ export default function AreaPage() {
                 }
               >
                 {crags.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Brak skał.</p>
+                  <p className="text-sm text-muted-foreground">{kind === "all" ? "Brak skał." : `Brak skał z drogami ${kind === "sport" ? "sportowymi" : "tradowymi"}.`}</p>
                 ) : (
                   <ul className="flex flex-col">
                     {crags.map((crag) => (

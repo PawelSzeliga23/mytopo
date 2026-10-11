@@ -5,6 +5,7 @@ import { labelTextColor, type RouteRow, type RouteRows } from "@/crag/topo";
 import type { RouteOut } from "@/lib/api";
 import { formatDecimal } from "@/lib/format";
 import { bandColor } from "@/lib/grades";
+import { matchesKind, useRouteKind } from "@/lib/routeKind";
 import { useTheme } from "@/lib/theme";
 
 interface RouteListProps {
@@ -30,14 +31,17 @@ function meta(route: RouteOut): string {
 function Row({ row, hint, selected, hovered, onChoose, onHover, editable, onEdit }: { row: RouteRow; hint: string | null; selected: boolean; hovered: boolean } & Pick<RouteListProps, "onChoose" | "onHover" | "editable" | "onEdit">) {
   const { theme } = useTheme();
   const ref = useRef<HTMLLIElement>(null);
+  const { kind } = useRouteKind();
   useEffect(() => {
     // Selecting on the photo brings the row into view; the scroll margin keeps it below the sticky photo on phones.
     if (selected) ref.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
   }, [selected]);
   const { route } = row;
   const details = meta(route);
+  // A route of the other kind than the filter: faint, but still there to pick.
+  const muted = !matchesKind(route, kind) && !selected && !hovered;
   return (
-    <li ref={ref} className="flex items-start gap-1 scroll-mt-[32vh] lg:scroll-mt-4">
+    <li ref={ref} data-muted={muted || undefined} className={`flex items-start gap-1 scroll-mt-[32vh] lg:scroll-mt-4 ${muted ? "opacity-40" : ""}`}>
       <button
         type="button"
         aria-pressed={selected}
