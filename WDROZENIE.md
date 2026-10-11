@@ -6,22 +6,12 @@ W przykładach: serwer `user@serwer`, katalog `/opt/topo`, adres `https://topo.t
 
 ## 1. Kod i ustawienia na serwerze
 
-Na serwerze przygotuj katalog:
-
-```bash
-ssh -t user@serwer 'sudo mkdir -p /opt/topo && sudo chown $USER /opt/topo'
-```
-
-U siebie wyślij kod (aktualny commit z gałęzi, bez `media`, `.env` i `node_modules`):
-
-```bash
-git archive HEAD | ssh user@serwer "tar -xf - -C /opt/topo"
-```
-
-Na serwerze:
+Na serwerze (repo bez `media` i `cache` — te przenosisz w krokach 2–3):
 
 ```bash
 ssh user@serwer
+sudo mkdir -p /opt/topo && sudo chown $USER /opt/topo
+git clone https://github.com/PawelSzeliga23/mytopo.git /opt/topo
 cd /opt/topo
 cp .env.prod.example .env
 nano .env                              # uzupełnij wszystkie pola
@@ -117,14 +107,14 @@ i `sudo systemctl restart cloudflared` (albo dodaj hostname w panelu Zero Trust,
 
 ## Aktualizacja aplikacji
 
-U siebie (po scaleniu zmian):
+Po wypchnięciu zmian na GitHub, na serwerze:
 
 ```bash
-git archive HEAD | ssh user@serwer "tar -xf - -C /opt/topo"
-ssh user@serwer "cd /opt/topo && docker compose -f docker-compose.prod.yml up -d --build"
+cd /opt/topo && git pull
+docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-Nadpisuje tylko pliki kodu — `.env`, `media` i baza zostają.
+`.env`, `media` i baza zostają bez zmian.
 
 ## Kopia zapasowa
 
