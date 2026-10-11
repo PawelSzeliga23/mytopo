@@ -17,7 +17,8 @@ def create_app() -> FastAPI:
     settings = get_settings()
     if settings.edit_password and not settings.secret_key:
         raise RuntimeError("SECRET_KEY jest wymagany, gdy ustawiono EDIT_PASSWORD")
-    app = FastAPI(title="Topo API")
+    docs = settings.api_docs
+    app = FastAPI(title="Topo API", docs_url="/docs" if docs else None, redoc_url=None, openapi_url="/openapi.json" if docs else None)
     install_error_handlers(app)
 
     @app.get("/api/health")

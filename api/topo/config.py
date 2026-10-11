@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     cache_dir: str = "/data/cache"
     edit_password: str | None = None
     secret_key: str | None = None
+    # /docs and /openapi.json; off in production.
+    api_docs: bool = True
 
 
 @lru_cache

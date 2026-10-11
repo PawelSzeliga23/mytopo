@@ -1,0 +1,51 @@
+# Production on the server: docker compose -f docker-compose.prod.yml up -d --build
+# Settings in .env (see .env.prod.example). No depth worker: new photos stay in 2D until their depth is computed elsewhere.
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: topo
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?ustaw DB_PASSWORD w .env}
+      POSTGRES_DB: topo
+    command: ["postgres", "-c", "shared_buffers=64MB"]
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U topo -d topo"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: ./api
+      args:
+        SYNC: "--no-dev"
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://topo:${DB_PASSWORD}@db:5432/topo
+      PUBLIC_URL: ${PUBLIC_URL:?ustaw PUBLIC_URL w .env}
+      EDIT_PASSWORD: ${EDIT_PASSWORD:?ustaw EDIT_PASSWORD w .env}
+      SECRET_KEY: ${SECRET_KEY:?ustaw SECRET_KEY w .env}
+      API_DOCS: "false"
+    # Only nginx (web) reaches the API, so the forwarded client address can be trusted.
+    command: ["sh", "-c", "alembic upgrade head && uvicorn topo.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'"]
+    volumes:
+      - ./media:/data/media
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build: ./web
+    restart: unless-stopped
+    volumes:
+      - ./media:/data/media:ro
+    ports:
+      - "${TOPO_PORT:-127.0.0.1:8090}:80"
+    depends_on:
+      - api
+
+volumes:
+  db-data:

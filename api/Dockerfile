@@ -1,6 +1,8 @@
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
+# EXTRAS="--extra depth" for the depth image; SYNC="--no-dev" for the production image (no test tools).
 ARG EXTRAS=""
+ARG SYNC=""
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
     UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
@@ -9,9 +11,9 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
 
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-install-project ${EXTRAS}
+RUN uv sync --frozen --no-install-project ${EXTRAS} ${SYNC}
 COPY . .
-RUN uv sync --frozen ${EXTRAS}
+RUN uv sync --frozen ${EXTRAS} ${SYNC}
 
 EXPOSE 8000
 CMD ["uvicorn", "topo.main:app", "--host", "0.0.0.0", "--port", "8000"]
